@@ -48,5 +48,6 @@ coverage
 .cache
 tmp
 temp
+storage
 .agents/
 AGENTS.md
