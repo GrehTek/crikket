@@ -36,6 +36,7 @@ import {
   EMPTY_DEBUGGER_SUMMARY,
   getDebuggerCaptureSummary,
   getSubmissionErrorMessage,
+  isUnauthorizedSubmissionError,
   normalizeOptionalText,
 } from "@/lib/recorder-submit"
 import { formatDuration, getDeviceInfo } from "@/lib/utils"
@@ -343,6 +344,10 @@ function App() {
       )
       setState("success")
     } catch (error) {
+      if (isUnauthorizedSubmissionError(error)) {
+        const loginUrl = new URL("/login", env.VITE_APP_URL).toString()
+        window.open(loginUrl, "_blank", "noopener,noreferrer")
+      }
       setSubmitError(getSubmissionErrorMessage(error))
       setState("stopped")
     }

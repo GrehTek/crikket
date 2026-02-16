@@ -63,6 +63,10 @@ export function dedupeMessages(messages: string[]): string[] {
   return [...new Set(messages.map((entry) => entry.trim()).filter(Boolean))]
 }
 
+export function isUnauthorizedSubmissionError(error: unknown): boolean {
+  return error instanceof ORPCError && error.code === "UNAUTHORIZED"
+}
+
 export function getSubmissionErrorMessage(error: unknown): string {
   if (error instanceof ORPCError) {
     const validationMessages = getValidationIssueMessages(error.data)
@@ -70,8 +74,8 @@ export function getSubmissionErrorMessage(error: unknown): string {
       return `Please fix the report input: ${validationMessages.slice(0, 3).join(" | ")}`
     }
 
-    if (error.code === "UNAUTHORIZED") {
-      return "Your session has expired. Sign in again, then resubmit this report."
+    if (isUnauthorizedSubmissionError(error)) {
+      return "Unauthorized session. Sign in again, then resubmit this report."
     }
 
     if (error.code === "PAYLOAD_TOO_LARGE") {
