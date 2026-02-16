@@ -6,6 +6,7 @@
     "./components/*": "./src/components/*.tsx",
     "./lib/*": "./src/lib/*.ts",
     "./hooks/*": "./src/hooks/*.ts",
+    "./types/*": "./src/types/*.ts",
     "./styles/*": "./src/styles/*"
   },
   "scripts": {
