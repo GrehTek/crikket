@@ -59,6 +59,7 @@ export function UserSettingsPasswordForm() {
                 name={field.name}
                 onBlur={field.handleBlur}
                 onChange={(event) => field.handleChange(event.target.value)}
+                placeholder="••••••••"
                 type="password"
                 value={field.state.value}
               />
@@ -85,6 +86,7 @@ export function UserSettingsPasswordForm() {
                 name={field.name}
                 onBlur={field.handleBlur}
                 onChange={(event) => field.handleChange(event.target.value)}
+                placeholder="••••••••"
                 type="password"
                 value={field.state.value}
               />
@@ -111,6 +113,7 @@ export function UserSettingsPasswordForm() {
                 name={field.name}
                 onBlur={field.handleBlur}
                 onChange={(event) => field.handleChange(event.target.value)}
+                placeholder="••••••••"
                 type="password"
                 value={field.state.value}
               />
