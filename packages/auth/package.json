@@ -17,12 +17,12 @@
   },
   "scripts": {},
   "dependencies": {
+    "@crikket/billing": "workspace:*",
     "@crikket/db": "workspace:*",
     "@crikket/env": "workspace:*",
     "@crikket/shared": "workspace:*",
     "@polar-sh/better-auth": "catalog:",
     "@polar-sh/checkout": "catalog:",
-    "@polar-sh/sdk": "catalog:",
     "@orpc/server": "catalog:",
     "@react-email/components": "catalog:",
     "@react-email/render": "catalog:",

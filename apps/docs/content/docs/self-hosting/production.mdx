@@ -12,6 +12,7 @@ DATABASE_URL
 BETTER_AUTH_SECRET
 BETTER_AUTH_URL
 CORS_ORIGINS
+BETTER_AUTH_COOKIE_DOMAIN (required when app and API use different subdomains)
 GOOGLE_CLIENT_ID
 GOOGLE_CLIENT_SECRET
 ENABLE_PAYMENTS (false)
@@ -56,6 +57,7 @@ If using a separate API domain:
 - `NEXT_PUBLIC_SERVER_URL=https://api.example.com`
 - `BETTER_AUTH_URL=https://api.example.com`
 - `CORS_ORIGINS=https://app.example.com,https://admin.example.com`
+- `BETTER_AUTH_COOKIE_DOMAIN=example.com`
 
 ## Storage
 

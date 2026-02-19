@@ -1,7 +1,10 @@
+import { polarClient } from "@crikket/billing/lib/payments"
+import { assertOrganizationCanAddMembers } from "@crikket/billing/service/entitlements"
+import { processPolarWebhookPayload } from "@crikket/billing/service/webhooks"
 import { db } from "@crikket/db"
 import * as schema from "@crikket/db/schema/auth"
 import { env } from "@crikket/env/server"
-import { checkout, polar, portal } from "@polar-sh/better-auth"
+import { checkout, polar, portal, webhooks } from "@polar-sh/better-auth"
 import { betterAuth } from "better-auth"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
 import { admin } from "better-auth/plugins/admin"
@@ -13,7 +16,6 @@ import {
   sendEmailVerificationLinkEmail,
   sendOrganizationInvitationEmail,
 } from "./lib/email/auth-emails"
-import { polarClient } from "./lib/payments"
 
 const MINUTE = 60
 const HOUR = 60 * MINUTE
@@ -23,6 +25,12 @@ const isProduction = env.NODE_ENV === "production"
 const trustedOrigins = Array.from(
   new Set([env.BETTER_AUTH_URL, ...env.CORS_ORIGINS])
 )
+const crossSubDomainCookies = env.BETTER_AUTH_COOKIE_DOMAIN
+  ? {
+      enabled: true,
+      domain: env.BETTER_AUTH_COOKIE_DOMAIN,
+    }
+  : undefined
 
 const socialProviders =
   env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
@@ -33,6 +41,25 @@ const socialProviders =
         },
       }
     : undefined
+
+const checkoutProducts = [
+  env.POLAR_PRO_PRODUCT_ID
+    ? ({ productId: env.POLAR_PRO_PRODUCT_ID, slug: "pro" } as const)
+    : null,
+  env.POLAR_STUDIO_PRODUCT_ID
+    ? ({ productId: env.POLAR_STUDIO_PRODUCT_ID, slug: "studio" } as const)
+    : null,
+].filter((product): product is { productId: string; slug: "pro" | "studio" } =>
+  Boolean(product)
+)
+
+const polarCheckout = checkout({
+  products: checkoutProducts,
+  successUrl: env.POLAR_SUCCESS_URL,
+  authenticatedUsersOnly: true,
+})
+
+const polarPortal = portal()
 
 export const auth = betterAuth({
   appName: "crikket",
@@ -98,6 +125,7 @@ export const auth = betterAuth({
   },
   advanced: {
     useSecureCookies: isProduction,
+    ...(crossSubDomainCookies ? { crossSubDomainCookies } : {}),
     defaultCookieAttributes: {
       sameSite: isProduction ? "none" : "lax",
       secure: isProduction,
@@ -115,6 +143,14 @@ export const auth = betterAuth({
           organizationName: data.organization.name,
           role: data.role,
         })
+      },
+      organizationHooks: {
+        beforeAcceptInvitation: async ({ invitation }) => {
+          await assertOrganizationCanAddMembers(invitation.organizationId)
+        },
+        beforeCreateInvitation: async ({ invitation }) => {
+          await assertOrganizationCanAddMembers(invitation.organizationId)
+        },
       },
     }),
     emailOTP({
@@ -138,19 +174,20 @@ export const auth = betterAuth({
             client: polarClient,
             createCustomerOnSignUp: true,
             enableCustomerPortal: true,
-            use: [
-              checkout({
-                products: [
-                  {
-                    productId: env.POLAR_PRODUCT_ID || "",
-                    slug: "pro",
-                  },
-                ],
-                successUrl: env.POLAR_SUCCESS_URL,
-                authenticatedUsersOnly: true,
-              }),
-              portal(),
-            ],
+            use: env.POLAR_WEBHOOK_SECRET
+              ? [
+                  polarCheckout,
+                  polarPortal,
+                  webhooks({
+                    secret: env.POLAR_WEBHOOK_SECRET,
+                    onPayload: async (payload) => {
+                      await processPolarWebhookPayload(
+                        payload as Record<string, unknown>
+                      )
+                    },
+                  }),
+                ]
+              : [polarCheckout, polarPortal],
           }),
         ]
       : []),

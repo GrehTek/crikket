@@ -7,10 +7,14 @@ export const env = createEnv({
     DATABASE_URL: z.string().min(1),
     BETTER_AUTH_SECRET: z.string().min(32),
     BETTER_AUTH_URL: z.url(),
+    BETTER_AUTH_COOKIE_DOMAIN: z.string().min(1).optional(),
     POLAR_ACCESS_TOKEN: z.string().min(1).optional(),
     POLAR_SUCCESS_URL: z.url().optional(),
     POLAR_WEBHOOK_SECRET: z.string().min(1).optional(),
-    POLAR_PRODUCT_ID: z.string().min(1).optional(),
+    POLAR_PRO_PRODUCT_ID: z.string().min(1).optional(),
+    POLAR_PRO_YEARLY_PRODUCT_ID: z.string().min(1).optional(),
+    POLAR_STUDIO_PRODUCT_ID: z.string().min(1).optional(),
+    POLAR_STUDIO_YEARLY_PRODUCT_ID: z.string().min(1).optional(),
     CORS_ORIGINS: z
       .string()
       .optional()

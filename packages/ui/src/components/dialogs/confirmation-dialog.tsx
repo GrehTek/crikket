@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@crikket/ui/components/ui/dialog"
+import type { ReactNode } from "react"
 
 interface ConfirmationDialogProps {
   open: boolean
@@ -16,6 +17,7 @@ interface ConfirmationDialogProps {
   onConfirm: () => void | Promise<void>
   title: string
   description: string
+  content?: ReactNode
   confirmText?: string
   cancelText?: string
   variant?: "default" | "destructive"
@@ -28,6 +30,7 @@ export function ConfirmationDialog({
   onConfirm,
   title,
   description,
+  content,
   confirmText = "Confirm",
   cancelText = "Cancel",
   variant = "default",
@@ -44,6 +47,7 @@ export function ConfirmationDialog({
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
+          {content ? content : null}
         </DialogHeader>
         <DialogFooter>
           <Button

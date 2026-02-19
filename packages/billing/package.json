@@ -1,34 +1,23 @@
 {
-  "name": "@crikket/api",
+  "name": "@crikket/billing",
   "type": "module",
   "exports": {
-    ".": {
-      "default": "./src/index.ts"
-    },
     "./*": {
       "default": "./src/*.ts"
     }
   },
   "scripts": {},
   "dependencies": {
-    "@crikket/auth": "workspace:*",
-    "@crikket/billing": "workspace:*",
-    "@crikket/bug-reports": "workspace:*",
     "@crikket/db": "workspace:*",
     "@crikket/env": "workspace:*",
     "@crikket/shared": "workspace:*",
-    "@orpc/client": "catalog:",
-    "@orpc/openapi": "catalog:",
+    "@polar-sh/sdk": "catalog:",
     "@orpc/server": "catalog:",
-    "@orpc/zod": "catalog:",
-    "@types/pg": "catalog:",
-    "dotenv": "catalog:",
     "drizzle-orm": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@crikket/config": "workspace:*",
-    "hono": "catalog:",
     "typescript": "catalog:"
   }
 }

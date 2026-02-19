@@ -23,8 +23,10 @@ import type {
 
 interface OrganizationMembersSectionProps {
   organizationId: string
+  currentPlan: "free" | "pro" | "studio"
   currentUserId: string
   currentUserRole: OrganizationRole
+  memberCap: number | null
   members: OrganizationMemberRow[]
   totalMembers: number
   pendingInvitations: OrganizationInvitationRow[]
@@ -43,14 +45,19 @@ function getErrorMessage(
 
 export function OrganizationMembersSection({
   organizationId,
+  currentPlan,
   currentUserId,
   currentUserRole,
+  memberCap,
   members,
   totalMembers,
   pendingInvitations,
 }: OrganizationMembersSectionProps) {
   const router = useRouter()
   const canManage = canManageMembers(currentUserRole)
+  const hasReachedMemberCap =
+    typeof memberCap === "number" && totalMembers >= memberCap
+  const canInviteMembers = canManage && !hasReachedMemberCap
 
   const inviteMemberMutation = useMutation({
     mutationFn: async (input: { email: string; role: "admin" | "member" }) => {
@@ -147,7 +154,7 @@ export function OrganizationMembersSection({
         </CardHeader>
         <CardContent className="space-y-3">
           <InviteMemberForm
-            canInviteMembers={canManage}
+            canInviteMembers={canInviteMembers}
             isInviting={inviteMemberMutation.isPending}
             onInviteMember={(input) => inviteMemberMutation.mutateAsync(input)}
           />
@@ -156,6 +163,13 @@ export function OrganizationMembersSection({
               Only admins can invite new members.
             </p>
           )}
+          {hasReachedMemberCap ? (
+            <p className="text-muted-foreground text-sm">
+              {currentPlan === "pro"
+                ? "Pro plan member limit reached. Upgrade to Studio to invite more teammates."
+                : "Member limit reached for this organization plan."}
+            </p>
+          ) : null}
         </CardContent>
       </Card>
 

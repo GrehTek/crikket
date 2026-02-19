@@ -1,3 +1,4 @@
+import { getOrganizationEntitlements } from "@crikket/billing/service/entitlements"
 import { db } from "@crikket/db"
 import { bugReport } from "@crikket/db/schema/bug-report"
 import {
@@ -31,6 +32,55 @@ const priorityValues = Object.values(PRIORITY_OPTIONS) as [
   ...Priority[],
 ]
 
+type CreateBugReportEntitlementInput = {
+  attachmentType: "video" | "screenshot"
+  metadata?: {
+    durationMs?: number
+  }
+}
+
+async function assertCreateBugReportEntitlements(input: {
+  organizationId: string
+  payload: CreateBugReportEntitlementInput
+}): Promise<void> {
+  const entitlements = await getOrganizationEntitlements(input.organizationId)
+
+  if (!entitlements.canCreateBugReports) {
+    throw new ORPCError("FORBIDDEN", {
+      message:
+        "This organization is on the free plan. Upgrade to Pro to create bug reports.",
+    })
+  }
+
+  if (input.payload.attachmentType !== "video") {
+    return
+  }
+
+  if (!entitlements.canUploadVideo) {
+    throw new ORPCError("FORBIDDEN", {
+      message:
+        "Video uploads are not available for this organization plan. Upgrade to Pro to continue.",
+    })
+  }
+
+  if (typeof entitlements.maxVideoDurationMs !== "number") {
+    return
+  }
+
+  const durationMs = input.payload.metadata?.durationMs
+  if (typeof durationMs !== "number") {
+    throw new ORPCError("BAD_REQUEST", {
+      message: "Video duration metadata is required for video uploads.",
+    })
+  }
+
+  if (durationMs > entitlements.maxVideoDurationMs) {
+    throw new ORPCError("FORBIDDEN", {
+      message: "Video exceeds your organization plan duration limit.",
+    })
+  }
+}
+
 export const createBugReport = protectedProcedure
   .input(
     z.object({
@@ -55,6 +105,16 @@ export const createBugReport = protectedProcedure
   )
   .handler(async ({ context, input }) => {
     const activeOrgId = requireActiveOrgId(context.session)
+    await assertCreateBugReportEntitlements({
+      organizationId: activeOrgId,
+      payload: {
+        attachmentType: input.attachmentType,
+        metadata: {
+          durationMs: input.metadata?.durationMs,
+        },
+      },
+    })
+
     const storage = getStorageProvider()
     const filename = generateFilename(input.attachmentType)
 

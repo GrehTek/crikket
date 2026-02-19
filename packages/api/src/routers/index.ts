@@ -3,6 +3,7 @@ import type { RouterClient } from "@orpc/server"
 import { publicProcedure } from "../index"
 
 import { authRouter } from "./auth"
+import { billingRouter } from "./billing"
 import { bugReportRouter } from "./bug-report"
 
 export const appRouter = {
@@ -10,6 +11,7 @@ export const appRouter = {
     return "OK"
   }),
   auth: authRouter,
+  billing: billingRouter,
   bugReport: bugReportRouter,
 }
 export type AppRouter = typeof appRouter
