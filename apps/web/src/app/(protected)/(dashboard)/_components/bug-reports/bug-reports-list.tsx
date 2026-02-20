@@ -13,19 +13,7 @@ import { BugReportsDeleteDialogs } from "./bug-reports-delete-dialogs"
 import { BugReportsToolbar } from "./bug-reports-toolbar"
 
 export function BugReportsList() {
-  const {
-    debouncedSearch,
-    sort,
-    filters,
-    clearFilters,
-    setSearchValue,
-    setSort,
-    togglePriority,
-    toggleStatus,
-    toggleVisibility,
-    searchValue,
-    hasActiveFilters,
-  } = useBugReportsFilters()
+  const filtersState = useBugReportsFilters()
 
   const {
     reports,
@@ -38,35 +26,12 @@ export function BugReportsList() {
     refetch,
     loadMoreRef,
   } = useBugReportsData({
-    search: debouncedSearch,
-    sort,
-    filters,
+    search: filtersState.debouncedSearch,
+    sort: filtersState.sort,
+    filters: filtersState.filters,
   })
 
-  const {
-    selectedIds,
-    selectedCount,
-    clearSelection,
-    toggleSelection,
-    deleteReportId,
-    setDeleteReportId,
-    bulkDeleteOpen,
-    setBulkDeleteOpen,
-    bulkStatus,
-    setBulkStatus,
-    bulkPriority,
-    setBulkPriority,
-    bulkVisibility,
-    setBulkVisibility,
-    bulkTagsInput,
-    setBulkTagsInput,
-    isMutating,
-    updateMutation,
-    deleteMutation,
-    bulkDeleteMutation,
-    handleBulkDelete,
-    handleBulkUpdate,
-  } = useBugReportsActions({
+  const actionsState = useBugReportsActions({
     reportIds: reports.map((report) => report.id),
     refetchAll,
   })
@@ -74,40 +39,42 @@ export function BugReportsList() {
   return (
     <div
       className={
-        selectedCount > 0 ? "space-y-4 pb-40 sm:pb-32 lg:pb-28" : "space-y-4"
+        actionsState.selectedCount > 0
+          ? "space-y-4 pb-40 sm:pb-32 lg:pb-28"
+          : "space-y-4"
       }
     >
       <BugReportsToolbar
-        filters={filters}
-        onClearFilters={clearFilters}
-        onSearchChange={setSearchValue}
-        onSortChange={setSort}
-        onTogglePriority={togglePriority}
-        onToggleStatus={toggleStatus}
-        onToggleVisibility={toggleVisibility}
-        search={searchValue}
-        sort={sort}
+        filters={filtersState.filters}
+        onClearFilters={filtersState.clearFilters}
+        onSearchChange={filtersState.setSearchValue}
+        onSortChange={filtersState.setSort}
+        onTogglePriority={filtersState.togglePriority}
+        onToggleStatus={filtersState.toggleStatus}
+        onToggleVisibility={filtersState.toggleVisibility}
+        search={filtersState.searchValue}
+        sort={filtersState.sort}
         stats={stats}
       />
 
       <SelectionActionBar
         actions={
           <BugReportsBulkActions
-            bulkPriority={bulkPriority}
-            bulkStatus={bulkStatus}
-            bulkTagsInput={bulkTagsInput}
-            bulkVisibility={bulkVisibility}
-            isMutating={isMutating}
-            onApplyUpdates={handleBulkUpdate}
-            onBulkPriorityChange={setBulkPriority}
-            onBulkStatusChange={setBulkStatus}
-            onBulkTagsChange={setBulkTagsInput}
-            onBulkVisibilityChange={setBulkVisibility}
-            onRequestBulkDelete={() => setBulkDeleteOpen(true)}
+            bulkPriority={actionsState.bulkPriority}
+            bulkStatus={actionsState.bulkStatus}
+            bulkTagsInput={actionsState.bulkTagsInput}
+            bulkVisibility={actionsState.bulkVisibility}
+            isMutating={actionsState.isMutating}
+            onApplyUpdates={actionsState.handleBulkUpdate}
+            onBulkPriorityChange={actionsState.setBulkPriority}
+            onBulkStatusChange={actionsState.setBulkStatus}
+            onBulkTagsChange={actionsState.setBulkTagsInput}
+            onBulkVisibilityChange={actionsState.setBulkVisibility}
+            onRequestBulkDelete={() => actionsState.setBulkDeleteOpen(true)}
           />
         }
-        onClearSelection={clearSelection}
-        selectedCount={selectedCount}
+        onClearSelection={actionsState.clearSelection}
+        selectedCount={actionsState.selectedCount}
       />
 
       {isError ? (
@@ -145,10 +112,12 @@ export function BugReportsList() {
           </div>
           <div className="text-center">
             <h2 className="font-semibold text-2xl">
-              {hasActiveFilters ? "No matching reports" : "No bug reports yet"}
+              {filtersState.hasActiveFilters
+                ? "No matching reports"
+                : "No bug reports yet"}
             </h2>
             <p className="mt-2 text-muted-foreground text-sm">
-              {hasActiveFilters
+              {filtersState.hasActiveFilters
                 ? "Try adjusting your search or filters."
                 : "Start reporting bugs to see them here."}
             </p>
@@ -160,15 +129,15 @@ export function BugReportsList() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
           {reports.map((report) => (
             <BugReportCard
-              isChecked={selectedIds.has(report.id)}
-              isMutating={isMutating}
+              isChecked={actionsState.selectedIds.has(report.id)}
+              isMutating={actionsState.isMutating}
               key={report.id}
-              onRequestDelete={() => setDeleteReportId(report.id)}
+              onRequestDelete={() => actionsState.setDeleteReportId(report.id)}
               onToggleSelection={(checked) =>
-                toggleSelection(report.id, checked)
+                actionsState.toggleSelection(report.id, checked)
               }
               onUpdateReport={(input) =>
-                updateMutation.mutate({
+                actionsState.updateMutation.mutate({
                   id: report.id,
                   ...input,
                 })
@@ -188,26 +157,28 @@ export function BugReportsList() {
       <div aria-hidden className="h-1 w-full" ref={loadMoreRef} />
 
       <BugReportsDeleteDialogs
-        bulkDeleteOpen={bulkDeleteOpen}
-        deleteReportId={deleteReportId}
-        isBulkDeleteLoading={bulkDeleteMutation.isPending}
-        isSingleDeleteLoading={deleteMutation.isPending}
-        onBulkDeleteConfirm={handleBulkDelete}
-        onBulkDeleteOpenChange={setBulkDeleteOpen}
+        bulkDeleteOpen={actionsState.bulkDeleteOpen}
+        deleteReportId={actionsState.deleteReportId}
+        isBulkDeleteLoading={actionsState.bulkDeleteMutation.isPending}
+        isSingleDeleteLoading={actionsState.deleteMutation.isPending}
+        onBulkDeleteConfirm={actionsState.handleBulkDelete}
+        onBulkDeleteOpenChange={actionsState.setBulkDeleteOpen}
         onSingleDeleteConfirm={async () => {
-          if (!deleteReportId) {
+          if (!actionsState.deleteReportId) {
             return
           }
 
-          await deleteMutation.mutateAsync(deleteReportId)
-          setDeleteReportId(null)
+          await actionsState.deleteMutation.mutateAsync(
+            actionsState.deleteReportId
+          )
+          actionsState.setDeleteReportId(null)
         }}
         onSingleDeleteOpenChange={(open) => {
           if (!open) {
-            setDeleteReportId(null)
+            actionsState.setDeleteReportId(null)
           }
         }}
-        selectedCount={selectedCount}
+        selectedCount={actionsState.selectedCount}
       />
     </div>
   )
