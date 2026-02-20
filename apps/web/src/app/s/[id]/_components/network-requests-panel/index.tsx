@@ -7,11 +7,11 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@crikket/ui/components/ui/resizable"
-import { useDebounce } from "@crikket/ui/hooks/use-debounce"
+import { useDebouncedCallback } from "@crikket/ui/hooks/use-debounced-callback"
 import { cn } from "@crikket/ui/lib/utils"
 import { Search } from "lucide-react"
 import { parseAsString, useQueryState } from "nuqs"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef } from "react"
 
 import { formatOffset } from "../utils"
 import { NetworkRequestDetails } from "./network-request-details"
@@ -22,6 +22,7 @@ import { safeParseUrl, statusTone } from "./utils"
 const REQUEST_LIST_DEFAULT_HEIGHT = "300px"
 const REQUEST_LIST_MIN_HEIGHT = "190px"
 const DETAILS_MIN_HEIGHT = "220px"
+const SEARCH_DEBOUNCE_MS = 500
 
 export function NetworkRequestsPanel({
   bugReportId,
@@ -39,13 +40,7 @@ export function NetworkRequestsPanel({
     "networkSearch",
     parseAsString
   )
-  const [searchInputValue, setSearchInputValue] = useState(
-    searchParamValue ?? ""
-  )
-  const debouncedSearchValue = useDebounce(searchInputValue)
-  const lastSyncedSearchParamRef = useRef<string | null>(
-    (searchParamValue ?? "").trim() || null
-  )
+  const searchInputRef = useRef<HTMLInputElement | null>(null)
   const listContainerRef = useRef<HTMLDivElement | null>(null)
   const loadMoreRef = useRef<HTMLDivElement | null>(null)
 
@@ -61,26 +56,16 @@ export function NetworkRequestsPanel({
 
   const normalizedQuery = (searchParamValue ?? "").trim().toLowerCase()
 
-  useEffect(() => {
-    const normalizedSearchParamValue = (searchParamValue ?? "").trim() || null
-    if (normalizedSearchParamValue === lastSyncedSearchParamRef.current) {
-      return
-    }
-
-    lastSyncedSearchParamRef.current = normalizedSearchParamValue
-    setSearchInputValue(searchParamValue ?? "")
-  }, [searchParamValue])
-
-  useEffect(() => {
-    const normalizedDebouncedValue = debouncedSearchValue.trim()
+  const syncSearchQuery = useDebouncedCallback((rawValue: string) => {
+    const normalizedSearchValue = rawValue.trim()
     const nextSearchParamValue =
-      normalizedDebouncedValue.length > 0 ? normalizedDebouncedValue : null
+      normalizedSearchValue.length > 0 ? normalizedSearchValue : null
+    const normalizedSearchParamValue = (searchParamValue ?? "").trim() || null
 
-    if (nextSearchParamValue === lastSyncedSearchParamRef.current) {
+    if (nextSearchParamValue === normalizedSearchParamValue) {
       return
     }
 
-    lastSyncedSearchParamRef.current = nextSearchParamValue
     setSearchParamValue(nextSearchParamValue, { history: "replace" }).catch(
       (error: unknown) => {
         reportNonFatalError(
@@ -89,7 +74,21 @@ export function NetworkRequestsPanel({
         )
       }
     )
-  }, [debouncedSearchValue, setSearchParamValue])
+  }, SEARCH_DEBOUNCE_MS)
+
+  useEffect(() => {
+    const input = searchInputRef.current
+    if (!input) {
+      return
+    }
+
+    const nextInputValue = searchParamValue ?? ""
+    if (input.value === nextInputValue) {
+      return
+    }
+
+    input.value = nextInputValue
+  }, [searchParamValue])
 
   const highlightedEntryIdSet = useMemo(
     () => new Set(highlightedEntryIds),
@@ -178,11 +177,12 @@ export function NetworkRequestsPanel({
           <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
             className="h-8 pl-7 text-xs"
+            defaultValue={searchParamValue ?? ""}
             onChange={(event) => {
-              setSearchInputValue(event.target.value)
+              syncSearchQuery(event.target.value)
             }}
             placeholder="Filter by method, URL, or status..."
-            value={searchInputValue}
+            ref={searchInputRef}
           />
         </div>
       </div>

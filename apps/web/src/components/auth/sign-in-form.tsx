@@ -50,25 +50,28 @@ export function SignInForm() {
       onChange: loginFormSchema,
     },
     onSubmit: async ({ value }) => {
-      try {
-        const { error } = await authClient.signIn.email({
+      const result = await authClient.signIn
+        .email({
           email: value.email,
           password: value.password,
           callbackURL,
         })
+        .catch(() => null)
 
-        if (error) {
-          toast.error(getAuthErrorMessage(error))
-          return
-        }
-
-        toast.success("Signed in successfully.")
-        router.push("/")
-      } catch (_error) {
+      if (!result) {
         toast.error(
           "Unable to reach the auth server. Please try again in a moment."
         )
+        return
       }
+
+      if (result.error) {
+        toast.error(getAuthErrorMessage(result.error))
+        return
+      }
+
+      toast.success("Signed in successfully.")
+      router.push("/")
     },
   })
 
@@ -79,22 +82,26 @@ export function SignInForm() {
   }, [router, session])
 
   const handleGoogleSignIn = async () => {
-    try {
-      setIsSocialSignInPending(true)
+    setIsSocialSignInPending(true)
 
-      const { error } = await authClient.signIn.social({
+    const result = await authClient.signIn
+      .social({
         provider: "google",
         callbackURL,
       })
+      .catch(() => null)
 
-      if (error) {
-        toast.error(getAuthErrorMessage(error))
-      }
-    } catch (_error) {
+    if (!result) {
       toast.error("Unable to reach the auth server. Please try again.")
-    } finally {
       setIsSocialSignInPending(false)
+      return
     }
+
+    if (result.error) {
+      toast.error(getAuthErrorMessage(result.error))
+    }
+
+    setIsSocialSignInPending(false)
   }
 
   if (isPending) {

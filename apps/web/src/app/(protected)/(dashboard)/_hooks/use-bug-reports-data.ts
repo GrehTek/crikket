@@ -82,6 +82,10 @@ export function useBugReportsData({
     reports,
     stats: statsQuery.data,
     refetchAll,
-    query,
+    isError: query.isError,
+    isLoading: query.isLoading,
+    isFetching: query.isFetching,
+    errorMessage: query.error?.message,
+    refetch: query.refetch,
   }
 }

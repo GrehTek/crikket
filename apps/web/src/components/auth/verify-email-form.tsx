@@ -52,22 +52,23 @@ export function VerifyEmailForm({ email }: VerifyEmailFormProps) {
   })
 
   const handleSendCode = async () => {
-    try {
-      setIsSendingCode(true)
+    setIsSendingCode(true)
 
-      await client.auth.sendEmailVerificationOtpStrict({})
+    await client.auth
+      .sendEmailVerificationOtpStrict({})
+      .then(() => {
+        start()
+        toast.success("Verification code sent to your email.")
+      })
+      .catch((error: unknown) => {
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : "Unable to send verification code. Please try again."
+        toast.error(errorMessage)
+      })
 
-      start()
-      toast.success("Verification code sent to your email.")
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : "Unable to send verification code. Please try again."
-      toast.error(errorMessage)
-    } finally {
-      setIsSendingCode(false)
-    }
+    setIsSendingCode(false)
   }
 
   return (

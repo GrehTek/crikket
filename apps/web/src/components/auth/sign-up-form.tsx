@@ -30,30 +30,33 @@ export function SignUpForm() {
       onChange: registerFormSchema,
     },
     onSubmit: async ({ value }) => {
-      try {
-        const { data, error } = await authClient.signUp.email({
+      const result = await authClient.signUp
+        .email({
           name: value.name,
           email: value.email,
           password: value.password,
           callbackURL: env.NEXT_PUBLIC_APP_URL,
         })
+        .catch(() => null)
 
-        if (error) {
-          toast.error(getAuthErrorMessage(error))
-          return
-        }
-
-        if (data?.token) {
-          toast.success("Account created successfully.")
-          router.push("/")
-          return
-        }
-
-        toast.success("Account created. Sign in to continue.")
-        router.push(`/login?email=${encodeURIComponent(value.email)}`)
-      } catch (_error) {
+      if (!result) {
         toast.error("Unable to reach the auth server. Please try again.")
+        return
       }
+
+      if (result.error) {
+        toast.error(getAuthErrorMessage(result.error))
+        return
+      }
+
+      if (result.data?.token) {
+        toast.success("Account created successfully.")
+        router.push("/")
+        return
+      }
+
+      toast.success("Account created. Sign in to continue.")
+      router.push(`/login?email=${encodeURIComponent(value.email)}`)
     },
   })
 

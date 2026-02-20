@@ -11,7 +11,7 @@ import { useInfiniteQuery, useQuery } from "@tanstack/react-query"
 import { AlertCircle, Eye, EyeOff, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { parseAsString, parseAsStringLiteral, useQueryState } from "nuqs"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useMemo, useRef, useState } from "react"
 import { orpc } from "@/utils/orpc"
 
 import { BugReportCanvas } from "./bug-report-canvas"
@@ -79,24 +79,23 @@ export function BugReportView({ id }: BugReportViewProps) {
     parseAsStringLiteral(SIDEBAR_TABS).withDefault("details")
   )
   const [networkSearch] = useQueryState("networkSearch", parseAsString)
+  const shouldOpenDebuggerTimelineTabByDefault =
+    activeTab === "actions" || activeTab === "console"
+  const shouldOpenNetworkTabByDefault = activeTab === "network"
   const [hasOpenedDebuggerTimelineTab, setHasOpenedDebuggerTimelineTab] =
-    useState(false)
-  const [hasOpenedNetworkTab, setHasOpenedNetworkTab] = useState(false)
-
-  useEffect(() => {
-    if (activeTab === "actions" || activeTab === "console") {
-      setHasOpenedDebuggerTimelineTab(true)
-    }
-
-    if (activeTab === "network") {
-      setHasOpenedNetworkTab(true)
-    }
-  }, [activeTab])
+    useState(shouldOpenDebuggerTimelineTabByDefault)
+  const [hasOpenedNetworkTab, setHasOpenedNetworkTab] = useState(
+    shouldOpenNetworkTabByDefault
+  )
+  const shouldLoadDebuggerEvents =
+    hasOpenedDebuggerTimelineTab || shouldOpenDebuggerTimelineTabByDefault
+  const shouldLoadNetworkRequests =
+    hasOpenedNetworkTab || shouldOpenNetworkTabByDefault
 
   const debuggerEventsQuery = useQuery(
     orpc.bugReport.getDebuggerEvents.queryOptions({
       input: { id },
-      enabled: Boolean(id) && hasOpenedDebuggerTimelineTab,
+      enabled: Boolean(id) && shouldLoadDebuggerEvents,
     })
   )
 
@@ -114,7 +113,7 @@ export function BugReportView({ id }: BugReportViewProps) {
         lastPage.pagination.hasNextPage
           ? lastPage.pagination.page + 1
           : undefined,
-      enabled: Boolean(id) && hasOpenedNetworkTab,
+      enabled: Boolean(id) && shouldLoadNetworkRequests,
     })
   )
 
@@ -252,7 +251,7 @@ export function BugReportView({ id }: BugReportViewProps) {
     })
   }
 
-  const handleLoadMoreNetworkRequests = useCallback(() => {
+  const handleLoadMoreNetworkRequests = () => {
     if (!networkRequestsQuery.hasNextPage || networkRequestsQuery.isFetching) {
       return
     }
@@ -262,13 +261,17 @@ export function BugReportView({ id }: BugReportViewProps) {
       .catch((error: unknown) => {
         reportNonFatalError("Failed to fetch next network requests page", error)
       })
-  }, [
-    networkRequestsQuery.fetchNextPage,
-    networkRequestsQuery.hasNextPage,
-    networkRequestsQuery.isFetching,
-  ])
+  }
 
   const handleTabChange = (tab: SidebarTab) => {
+    if (tab === "actions" || tab === "console") {
+      setHasOpenedDebuggerTimelineTab(true)
+    }
+
+    if (tab === "network") {
+      setHasOpenedNetworkTab(true)
+    }
+
     setActiveTab(tab)
   }
 

@@ -70,24 +70,30 @@ export function ForgotPasswordForm() {
       return
     }
 
-    try {
-      setIsSendingCode(true)
+    setIsSendingCode(true)
 
-      const { error } = await authClient.emailOtp.requestPasswordReset({
+    const result = await authClient.emailOtp
+      .requestPasswordReset({
         email,
       })
+      .catch(() => null)
 
-      if (error) {
-        toast.error(getAuthErrorMessage(error))
-        return
-      }
-
-      setIsCodeSent(true)
-      start()
-      toast.success("A reset code has been sent to your email.")
-    } finally {
+    if (!result) {
+      toast.error("Unable to send reset code. Please try again.")
       setIsSendingCode(false)
+      return
     }
+
+    if (result.error) {
+      toast.error(getAuthErrorMessage(result.error))
+      setIsSendingCode(false)
+      return
+    }
+
+    setIsCodeSent(true)
+    start()
+    toast.success("A reset code has been sent to your email.")
+    setIsSendingCode(false)
   }
 
   return (

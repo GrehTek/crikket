@@ -13,69 +13,112 @@ import { BugReportsDeleteDialogs } from "./bug-reports-delete-dialogs"
 import { BugReportsToolbar } from "./bug-reports-toolbar"
 
 export function BugReportsList() {
-  const filtersState = useBugReportsFilters()
+  const {
+    debouncedSearch,
+    sort,
+    filters,
+    clearFilters,
+    setSearchValue,
+    setSort,
+    togglePriority,
+    toggleStatus,
+    toggleVisibility,
+    searchValue,
+    hasActiveFilters,
+  } = useBugReportsFilters()
 
-  const dataState = useBugReportsData({
-    search: filtersState.debouncedSearch,
-    sort: filtersState.sort,
-    filters: filtersState.filters,
+  const {
+    reports,
+    stats,
+    refetchAll,
+    isError,
+    errorMessage,
+    isLoading,
+    isFetching,
+    refetch,
+    loadMoreRef,
+  } = useBugReportsData({
+    search: debouncedSearch,
+    sort,
+    filters,
   })
 
-  const actionsState = useBugReportsActions({
-    reportIds: dataState.reports.map((report) => report.id),
-    refetchAll: dataState.refetchAll,
+  const {
+    selectedIds,
+    selectedCount,
+    clearSelection,
+    toggleSelection,
+    deleteReportId,
+    setDeleteReportId,
+    bulkDeleteOpen,
+    setBulkDeleteOpen,
+    bulkStatus,
+    setBulkStatus,
+    bulkPriority,
+    setBulkPriority,
+    bulkVisibility,
+    setBulkVisibility,
+    bulkTagsInput,
+    setBulkTagsInput,
+    isMutating,
+    updateMutation,
+    deleteMutation,
+    bulkDeleteMutation,
+    handleBulkDelete,
+    handleBulkUpdate,
+  } = useBugReportsActions({
+    reportIds: reports.map((report) => report.id),
+    refetchAll,
   })
 
   return (
     <div
       className={
-        actionsState.selectedCount > 0
-          ? "space-y-4 pb-40 sm:pb-32 lg:pb-28"
-          : "space-y-4"
+        selectedCount > 0 ? "space-y-4 pb-40 sm:pb-32 lg:pb-28" : "space-y-4"
       }
     >
       <BugReportsToolbar
-        filters={filtersState.filters}
-        onClearFilters={filtersState.clearFilters}
-        onSearchChange={filtersState.setSearchValue}
-        onSortChange={filtersState.setSort}
-        onTogglePriority={filtersState.togglePriority}
-        onToggleStatus={filtersState.toggleStatus}
-        onToggleVisibility={filtersState.toggleVisibility}
-        search={filtersState.searchValue}
-        sort={filtersState.sort}
-        stats={dataState.stats}
+        filters={filters}
+        onClearFilters={clearFilters}
+        onSearchChange={setSearchValue}
+        onSortChange={setSort}
+        onTogglePriority={togglePriority}
+        onToggleStatus={toggleStatus}
+        onToggleVisibility={toggleVisibility}
+        search={searchValue}
+        sort={sort}
+        stats={stats}
       />
 
       <SelectionActionBar
         actions={
           <BugReportsBulkActions
-            bulkPriority={actionsState.bulkPriority}
-            bulkStatus={actionsState.bulkStatus}
-            bulkTagsInput={actionsState.bulkTagsInput}
-            bulkVisibility={actionsState.bulkVisibility}
-            isMutating={actionsState.isMutating}
-            onApplyUpdates={actionsState.handleBulkUpdate}
-            onBulkPriorityChange={actionsState.setBulkPriority}
-            onBulkStatusChange={actionsState.setBulkStatus}
-            onBulkTagsChange={actionsState.setBulkTagsInput}
-            onBulkVisibilityChange={actionsState.setBulkVisibility}
-            onRequestBulkDelete={() => actionsState.setBulkDeleteOpen(true)}
+            bulkPriority={bulkPriority}
+            bulkStatus={bulkStatus}
+            bulkTagsInput={bulkTagsInput}
+            bulkVisibility={bulkVisibility}
+            isMutating={isMutating}
+            onApplyUpdates={handleBulkUpdate}
+            onBulkPriorityChange={setBulkPriority}
+            onBulkStatusChange={setBulkStatus}
+            onBulkTagsChange={setBulkTagsInput}
+            onBulkVisibilityChange={setBulkVisibility}
+            onRequestBulkDelete={() => setBulkDeleteOpen(true)}
           />
         }
-        onClearSelection={actionsState.clearSelection}
-        selectedCount={actionsState.selectedCount}
+        onClearSelection={clearSelection}
+        selectedCount={selectedCount}
       />
 
-      {dataState.query.isError ? (
+      {isError ? (
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
           <p className="font-medium text-sm">Failed to load bug reports</p>
           <p className="mt-1 text-muted-foreground text-sm">
-            {dataState.query.error.message || "Unexpected error"}
+            {errorMessage || "Unexpected error"}
           </p>
           <Button
             className="mt-3"
-            onClick={() => dataState.query.refetch()}
+            onClick={() => refetch()}
             size="sm"
             variant="outline"
           >
@@ -84,32 +127,28 @@ export function BugReportsList() {
         </div>
       ) : null}
 
-      {dataState.query.isLoading ? (
+      {isLoading ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {[1, 2, 3, 4].map((i) => (
+          {["s1", "s2", "s3", "s4"].map((skeletonKey) => (
             <div
               className="aspect-video w-full animate-pulse rounded-lg bg-muted"
-              key={i}
+              key={skeletonKey}
             />
           ))}
         </div>
       ) : null}
 
-      {!dataState.query.isLoading &&
-      dataState.reports.length === 0 &&
-      !dataState.query.isError ? (
+      {!isLoading && reports.length === 0 && !isError ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-4 rounded-lg border py-20">
           <div className="flex h-20 w-20 items-center justify-center rounded-full bg-muted">
             <Play className="h-10 w-10 text-muted-foreground" />
           </div>
           <div className="text-center">
             <h2 className="font-semibold text-2xl">
-              {filtersState.hasActiveFilters
-                ? "No matching reports"
-                : "No bug reports yet"}
+              {hasActiveFilters ? "No matching reports" : "No bug reports yet"}
             </h2>
             <p className="mt-2 text-muted-foreground text-sm">
-              {filtersState.hasActiveFilters
+              {hasActiveFilters
                 ? "Try adjusting your search or filters."
                 : "Start reporting bugs to see them here."}
             </p>
@@ -117,19 +156,19 @@ export function BugReportsList() {
         </div>
       ) : null}
 
-      {dataState.reports.length > 0 ? (
+      {reports.length > 0 ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-          {dataState.reports.map((report) => (
+          {reports.map((report) => (
             <BugReportCard
-              isChecked={actionsState.selectedIds.has(report.id)}
-              isMutating={actionsState.isMutating}
+              isChecked={selectedIds.has(report.id)}
+              isMutating={isMutating}
               key={report.id}
-              onRequestDelete={() => actionsState.setDeleteReportId(report.id)}
+              onRequestDelete={() => setDeleteReportId(report.id)}
               onToggleSelection={(checked) =>
-                actionsState.toggleSelection(report.id, checked)
+                toggleSelection(report.id, checked)
               }
               onUpdateReport={(input) =>
-                actionsState.updateMutation.mutate({
+                updateMutation.mutate({
                   id: report.id,
                   ...input,
                 })
@@ -140,37 +179,35 @@ export function BugReportsList() {
         </div>
       ) : null}
 
-      {dataState.query.isFetching ? (
+      {isFetching ? (
         <div className="flex justify-center py-2">
           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
         </div>
       ) : null}
 
-      <div aria-hidden className="h-1 w-full" ref={dataState.loadMoreRef} />
+      <div aria-hidden className="h-1 w-full" ref={loadMoreRef} />
 
       <BugReportsDeleteDialogs
-        bulkDeleteOpen={actionsState.bulkDeleteOpen}
-        deleteReportId={actionsState.deleteReportId}
-        isBulkDeleteLoading={actionsState.bulkDeleteMutation.isPending}
-        isSingleDeleteLoading={actionsState.deleteMutation.isPending}
-        onBulkDeleteConfirm={actionsState.handleBulkDelete}
-        onBulkDeleteOpenChange={actionsState.setBulkDeleteOpen}
+        bulkDeleteOpen={bulkDeleteOpen}
+        deleteReportId={deleteReportId}
+        isBulkDeleteLoading={bulkDeleteMutation.isPending}
+        isSingleDeleteLoading={deleteMutation.isPending}
+        onBulkDeleteConfirm={handleBulkDelete}
+        onBulkDeleteOpenChange={setBulkDeleteOpen}
         onSingleDeleteConfirm={async () => {
-          if (!actionsState.deleteReportId) {
+          if (!deleteReportId) {
             return
           }
 
-          await actionsState.deleteMutation.mutateAsync(
-            actionsState.deleteReportId
-          )
-          actionsState.setDeleteReportId(null)
+          await deleteMutation.mutateAsync(deleteReportId)
+          setDeleteReportId(null)
         }}
         onSingleDeleteOpenChange={(open) => {
           if (!open) {
-            actionsState.setDeleteReportId(null)
+            setDeleteReportId(null)
           }
         }}
-        selectedCount={actionsState.selectedCount}
+        selectedCount={selectedCount}
       />
     </div>
   )
