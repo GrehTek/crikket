@@ -1,21 +1,11 @@
-import { siteConfig } from "@crikket/shared/config/site"
 import { ModeToggle } from "@crikket/ui/components/mode-toggle"
 import { DocsLayout } from "fumadocs-ui/layouts/docs"
-import type { ReactNode } from "react"
+import { baseOptions } from "@/lib/layout.shared"
 import { source } from "@/lib/source"
 
-export default function Layout({ children }: { children: ReactNode }) {
+export default function Layout({ children }: LayoutProps<"/docs">) {
   return (
     <DocsLayout
-      githubUrl={siteConfig.links.github}
-      nav={{
-        title: (
-          <span className="font-bold tracking-tighter sm:text-lg">
-            {siteConfig.name}
-          </span>
-        ),
-        transparentMode: "top",
-      }}
       themeSwitch={{
         enabled: true,
         component: (
@@ -25,6 +15,7 @@ export default function Layout({ children }: { children: ReactNode }) {
         ),
       }}
       tree={source.getPageTree()}
+      {...baseOptions()}
     >
       {children}
     </DocsLayout>
