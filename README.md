@@ -1,77 +1,36 @@
-# crikket
+<h1 align="center">Crikket</h1>
 
-This project was created with [Better-T-Stack](https://github.com/AmanVarshney01/create-better-t-stack), a modern TypeScript stack that combines Next.js, Hono, ORPC, and more.
+<p align="center">
+  <a href="https://crikket.io">Website</a> ·
+  <a href="https://crikket.io/docs">Documentation</a> ·
+  <a href="https://app.crikket.io">Crikket App</a> ·
+  <a href="https://github.com/redpangilinan/crikket">GitHub</a>
+</p>
 
-## Features
+<p align="center"><strong>One-click bug reporting for modern teams.</strong><br />The open-source bug reporting tool.</p>
 
-- **TypeScript** - For type safety and improved developer experience
-- **Next.js** - Full-stack React framework
-- **TailwindCSS** - Utility-first CSS for rapid UI development
-- **shadcn/ui** - Reusable UI components
-- **Hono** - Lightweight, performant server framework
-- **oRPC** - End-to-end type-safe APIs with OpenAPI integration
-- **Bun** - Runtime environment
-- **Drizzle** - TypeScript-first ORM
-- **PostgreSQL** - Database engine
-- **Authentication** - Better-Auth
-- **Husky** - Git hooks for code quality
-- **PWA** - Progressive Web App support
-- **Turborepo** - Optimized monorepo build system
+<p align="center">View <a href="https://app.crikket.io/s/demo">Live Demo</a> here - Check out a sample bug report</p>
+
+
+
+![Crikket Open Graph Preview](./apps/docs/public/og.png)
 
 ## Getting Started
 
-First, install the dependencies:
+- [Hosted Service](https://crikket.io): Use Crikket right away. (paid)
+- [Self Hosting](https://crikket.io/docs/self-hosting): Run Crikket on your own infrastructure. (free)
 
-```bash
-bun install
-```
+Explore [documentation](https://crikket.io/docs) to learn more.
 
-## Database Setup
+## Why Crikket
 
-This project uses PostgreSQL with Drizzle ORM.
+Crikket makes bug reporting dead simple. Users click once, share a link, and your team gets the context needed to reproduce and fix issues faster.
 
-1. Make sure you have a PostgreSQL database set up.
-2. Update your `apps/server/.env` file with your PostgreSQL connection details.
+- One-click bug reports anyone can submit
+- Share report links instantly with your team
+- Capture the context needed to reproduce issues
+- Keep triage fast with less back-and-forth
 
-3. Apply the schema to your database:
+## License
 
-```bash
-bun run db:push
-```
-
-Then, run the development server:
-
-```bash
-bun run dev
-```
-
-Open [http://localhost:3001](http://localhost:3001) in your browser to see the web application.
-The API is running at [http://localhost:3000](http://localhost:3000).
-
-## Git Hooks and Formatting
-
-- Initialize hooks: `bun run prepare`
-
-## Project Structure
-
-```
-crikket/
-├── apps/
-│   ├── web/         # Frontend application (Next.js)
-│   └── server/      # Backend API (Hono, ORPC)
-├── packages/
-│   ├── api/         # API layer / business logic
-│   ├── auth/        # Authentication configuration & logic
-│   └── db/          # Database schema & queries
-```
-
-## Available Scripts
-
-- `bun run dev`: Start all applications in development mode
-- `bun run build`: Build all applications
-- `bun run dev:web`: Start only the web application
-- `bun run dev:server`: Start only the server
-- `bun run check-types`: Check TypeScript types across all apps
-- `bun run db:push`: Push schema changes to database
-- `bun run db:studio`: Open database studio UI
-- `cd apps/web && bun run generate-pwa-assets`: Generate PWA assets
+[AGPL-3.0 license](/LICENSE)
