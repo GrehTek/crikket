@@ -23,7 +23,10 @@ export function PricingSection() {
   const billingUrl = `${env.NEXT_PUBLIC_APP_URL}/settings/billing`
 
   return (
-    <section className="flex w-full flex-col items-center space-y-12">
+    <section
+      className="flex w-full scroll-mt-28 flex-col items-center space-y-12"
+      id="pricing"
+    >
       <div className="flex flex-col items-center space-y-3 px-4 text-center sm:px-0">
         <h2 className="font-bold text-3xl tracking-tight sm:text-4xl">
           Pricing

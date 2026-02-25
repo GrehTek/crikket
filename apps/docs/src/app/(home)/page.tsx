@@ -1,6 +1,7 @@
 import { AnimatedGridPattern } from "@crikket/ui/components/magicui/animated-grid-pattern"
 
 import { CtaSection } from "./_components/cta-section"
+import { FaqSection } from "./_components/faq-section"
 import { FeaturesSection } from "./_components/features-section"
 import { Hero } from "./_components/hero"
 import { LandingFooter } from "./_components/landing-footer"
@@ -21,6 +22,7 @@ export default function HomePage() {
         <Hero />
         <FeaturesSection />
         <PricingSection />
+        <FaqSection />
         <CtaSection />
       </main>
       <LandingFooter />

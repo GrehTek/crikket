@@ -376,7 +376,10 @@ const features = [
 
 export function FeaturesSection() {
   return (
-    <section className="w-full space-y-6 px-4 text-left sm:px-0">
+    <section
+      className="w-full scroll-mt-28 space-y-6 px-4 text-left sm:px-0"
+      id="features"
+    >
       <div className="space-y-3 text-center">
         <h2 className="font-bold text-3xl tracking-tight sm:text-4xl">
           What Crikket actually does
