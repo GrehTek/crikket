@@ -1,6 +1,7 @@
 "use client"
 
 import type { authClient } from "@crikket/auth/client"
+import { env } from "@crikket/env/web"
 import {
   Collapsible,
   CollapsibleContent,
@@ -69,7 +70,7 @@ const navMain = [
 const navSecondary = [
   {
     title: "Documentation",
-    url: "#" as const,
+    url: "/docs",
     icon: BookOpen,
   },
 ] as const
@@ -81,6 +82,10 @@ export function AppSidebar({
   ...props
 }: AppSidebarProps) {
   const pathname = usePathname()
+  const siteUrl = env.NEXT_PUBLIC_SITE_URL
+  const docsUrl = siteUrl
+    ? `${siteUrl.endsWith("/") ? siteUrl.slice(0, -1) : siteUrl}/docs`
+    : null
   const [expandedSections, setExpandedSections] = useState<
     Record<string, boolean>
   >({})
@@ -175,7 +180,18 @@ export function AppSidebar({
               {navSecondary.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
-                    render={(props) => <Link href={item.url} {...props} />}
+                    render={(props) =>
+                      docsUrl ? (
+                        <a
+                          href={docsUrl}
+                          rel="noopener noreferrer"
+                          target="_blank"
+                          {...props}
+                        />
+                      ) : (
+                        <button type="button" {...props} />
+                      )
+                    }
                     size="sm"
                   >
                     <item.icon />
