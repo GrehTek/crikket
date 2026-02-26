@@ -1,5 +1,6 @@
 {
   "name": "@crikket/db",
+  "version": "1.0.0",
   "type": "module",
   "exports": {
     ".": {
