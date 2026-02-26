@@ -15,6 +15,18 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async rewrites() {
+    if (!process.env.NEXT_PUBLIC_POSTHOG_HOST) {
+      return []
+    }
+
+    return [
+      {
+        source: "/ph/:path*",
+        destination: `${process.env.NEXT_PUBLIC_POSTHOG_HOST}/:path*`,
+      },
+    ]
+  },
 }
 
 export default nextConfig

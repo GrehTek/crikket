@@ -6,12 +6,21 @@ const withMDX = createMDX()
 const config = {
   reactStrictMode: true,
   async rewrites() {
-    return [
+    const rewrites = [
       {
         source: "/docs/:path*.mdx",
         destination: "/llms.mdx/docs/:path*",
       },
     ]
+
+    if (process.env.NEXT_PUBLIC_POSTHOG_HOST) {
+      rewrites.push({
+        source: "/ph/:path*",
+        destination: `${process.env.NEXT_PUBLIC_POSTHOG_HOST}/:path*`,
+      })
+    }
+
+    return rewrites
   },
 }
 

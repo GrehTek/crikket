@@ -14,6 +14,7 @@
     "@orpc/server": "catalog:",
     "@orpc/tanstack-query": "catalog:",
     "@tanstack/react-query": "catalog:",
+    "posthog-js": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
