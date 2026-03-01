@@ -18,7 +18,7 @@ const INITIAL_TOUCHED_STATE: ReviewDraftTouched = {
 
 export function useReviewForm(input: {
   initialDraft: CaptureSubmissionDraft
-  onSubmit: (draft: CaptureSubmissionDraft) => void
+  onSubmit: (draft: CaptureSubmissionDraft) => Promise<void> | void
 }): {
   draft: CaptureSubmissionDraft
   visibleErrors: ReviewDraftErrors

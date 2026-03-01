@@ -15,7 +15,7 @@ import type {
   ReviewSnapshot,
 } from "../types"
 import { mountCaptureUi } from "../ui/mount-capture-ui"
-import type { MountedCaptureUi } from "../ui/types"
+import type { CaptureReviewSubmitOptions, MountedCaptureUi } from "../ui/types"
 import {
   normalizeHost,
   normalizeKey,
@@ -87,8 +87,8 @@ export class CaptureSdkRuntime implements CaptureRuntimeController {
           throw new Error("Recording capture failed.")
         }
       },
-      onSubmit: (draft) => {
-        return this.submit(draft).then(() => undefined)
+      onSubmit: (draft, options) => {
+        return this.submit(draft, options).then(() => undefined)
       },
       onReset: () => {
         this.reset()
@@ -204,7 +204,10 @@ export class CaptureSdkRuntime implements CaptureRuntimeController {
     return blob
   }
 
-  async submit(draft: CaptureSubmissionDraft) {
+  async submit(
+    draft: CaptureSubmissionDraft,
+    options?: CaptureReviewSubmitOptions
+  ) {
     const config = this.getRuntimeConfig()
     if (!(this.currentMedia && this.currentReview)) {
       throw new Error(
@@ -213,10 +216,18 @@ export class CaptureSdkRuntime implements CaptureRuntimeController {
     }
 
     const { submitCapturedReport } = await import("./submit-captured-report")
+    const media =
+      this.currentMedia.captureType === "screenshot" &&
+      options?.screenshotBlobOverride
+        ? {
+            ...this.currentMedia,
+            blob: options.screenshotBlobOverride,
+          }
+        : this.currentMedia
     const result = await submitCapturedReport({
       config,
       draft,
-      media: this.currentMedia,
+      media,
       review: this.currentReview,
       submitTransport: this.submitTransport,
     })

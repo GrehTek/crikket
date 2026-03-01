@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { toUserError } from "../../../utils"
 import type {
+  CaptureReviewSubmitOptions,
   CaptureUiCallbacks,
   CaptureUiHandlers,
   CaptureUiStore,
@@ -95,15 +96,15 @@ export function useCaptureUiHandlers(
           }
         })
       },
-      onSubmit: (draft) => {
+      onSubmit: (draft, options?: CaptureReviewSubmitOptions) => {
         setIsSubmitPending(true)
         input.store.patchState({
           errorMessage: null,
           reviewDraft: draft,
         })
 
-        input.callbacks
-          .onSubmit(draft)
+        return input.callbacks
+          .onSubmit(draft, options)
           .catch((error) => {
             input.store.showError(toUserError(error))
           })

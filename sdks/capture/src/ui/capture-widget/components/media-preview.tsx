@@ -7,7 +7,7 @@ export function MediaPreview(props: {
   if (props.media?.captureType === "video") {
     return (
       <video
-        className="block w-full"
+        className="block h-full max-h-full w-full bg-black object-contain"
         controls
         playsInline
         preload="metadata"
@@ -22,7 +22,7 @@ export function MediaPreview(props: {
     return (
       <img
         alt="Captured screenshot"
-        className="block w-full"
+        className="block h-full max-h-full w-full object-contain"
         src={props.media.objectUrl}
       />
     )

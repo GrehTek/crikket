@@ -20,6 +20,7 @@ export function CaptureWidgetShell(props: {
   recordingTime: string
 }): React.JSX.Element {
   const isBusy = props.state.busy || props.isSubmitPending
+  const isReviewView = props.state.view === "review"
 
   return (
     <div className="crikket-capture-root">
@@ -37,7 +38,11 @@ export function CaptureWidgetShell(props: {
           }}
         >
           <Card
-            className="m-auto flex max-h-[calc(100dvh-2rem)] w-full max-w-[560px] flex-col overflow-hidden border-border/80 bg-card text-card-foreground shadow-2xl"
+            className={
+              isReviewView
+                ? "m-auto flex h-[min(820px,calc(100dvh-2rem))] w-full max-w-[1120px] flex-col overflow-hidden border-border/80 bg-card text-card-foreground shadow-2xl"
+                : "m-auto flex max-h-[calc(100dvh-2rem)] w-full max-w-[560px] flex-col overflow-hidden border-border/80 bg-card text-card-foreground shadow-2xl"
+            }
             role="dialog"
           >
             <CardHeader className="flex flex-row items-start justify-between gap-3 border-b">
@@ -66,7 +71,13 @@ export function CaptureWidgetShell(props: {
               </p>
             ) : null}
 
-            <CardContent className="min-h-0 overflow-y-auto px-0 pb-0">
+            <CardContent
+              className={
+                isReviewView
+                  ? "min-h-0 flex-1 overflow-hidden px-0 pb-0"
+                  : "min-h-0 overflow-y-auto px-0 pb-0"
+              }
+            >
               <CaptureWidgetView
                 handlers={props.handlers}
                 isBusy={isBusy}

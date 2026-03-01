@@ -4,6 +4,10 @@ import type {
   CaptureSubmissionDraft,
 } from "../types"
 
+export interface CaptureReviewSubmitOptions {
+  screenshotBlobOverride?: Blob
+}
+
 export interface CaptureUiState {
   view: "chooser" | "recording" | "review" | "success"
   overlayOpen: boolean
@@ -26,7 +30,10 @@ export interface CaptureUiHandlers {
   onStartVideo: () => void
   onTakeScreenshot: () => void
   onStopRecording: () => void
-  onSubmit: (draft: CaptureSubmissionDraft) => void
+  onSubmit: (
+    draft: CaptureSubmissionDraft,
+    options?: CaptureReviewSubmitOptions
+  ) => Promise<void>
   onCancel: () => void
   onRetry: () => void
   onCopyLink: () => void
@@ -38,7 +45,10 @@ export interface CaptureUiCallbacks {
   onStartVideo: () => Promise<{ startedAt: number }>
   onTakeScreenshot: () => Promise<void>
   onStopRecording: () => Promise<void>
-  onSubmit: (draft: CaptureSubmissionDraft) => Promise<void>
+  onSubmit: (
+    draft: CaptureSubmissionDraft,
+    options?: CaptureReviewSubmitOptions
+  ) => Promise<void>
   onReset: () => void
 }
 
