@@ -31,7 +31,7 @@ const faqItems = [
   {
     question: "What pricing options are available?",
     answer:
-      "Hosted Crikket is paid and currently offers Pro and Studio plans. Yearly billing is available with a 20% savings shown in pricing.",
+      "Crikket offers a free self-hosted option plus paid hosted Pro and Studio plans. Yearly billing is available with a 20% savings shown in pricing.",
   },
   {
     question: "Is there a free option?",

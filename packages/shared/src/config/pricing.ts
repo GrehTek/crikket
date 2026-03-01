@@ -16,6 +16,19 @@ export type PricingTier = {
 
 export const pricingTiers: PricingTier[] = [
   {
+    name: "Free",
+    slug: "free",
+    description: "Self-hosted deployment",
+    monthlyPrice: 0,
+    yearlyPrice: 0,
+    features: [
+      "Self-hosted deployment",
+      "Run on your own infrastructure",
+      "All features without limits",
+    ],
+    cta: "Start for Free",
+  },
+  {
     name: "Pro",
     slug: "pro",
     description: "For growing teams with up to 15 members",
@@ -29,7 +42,6 @@ export const pricingTiers: PricingTier[] = [
       "Replay with steps, logs, and network requests",
       "Public or private share links per report",
     ],
-    highlighted: true,
     cta: "Choose Pro",
   },
   {
@@ -43,6 +55,7 @@ export const pricingTiers: PricingTier[] = [
       "Unlimited team members",
       "Up to 20 minutes per video recording",
     ],
+    highlighted: true,
     cta: "Choose Studio",
   },
 ]

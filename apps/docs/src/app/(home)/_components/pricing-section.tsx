@@ -21,6 +21,7 @@ export function PricingSection() {
   )
 
   const billingUrl = `${env.NEXT_PUBLIC_APP_URL}/settings/billing`
+  const selfHostingDocsUrl = "/docs/self-hosting"
 
   return (
     <section
@@ -35,7 +36,7 @@ export function PricingSection() {
           Choose a plan that fits your team and start shipping bug fixes faster.
         </p>
         <p className="max-w-2xl text-balance text-muted-foreground text-sm sm:text-base">
-          Prefer self-hosting? It is free and open source.
+          Prefer self-hosting? Start with the free plan and deploy it yourself.
         </p>
 
         <div className="relative mt-6 inline-flex rounded-full border border-border p-1">
@@ -59,17 +60,18 @@ export function PricingSection() {
         </div>
       </div>
 
-      <div className="mx-auto grid w-full max-w-4xl grid-cols-1 gap-6 px-4 md:grid-cols-2 md:px-6">
+      <div className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-6 px-4 md:px-6 lg:grid-cols-3">
         {pricingTiers.map((tier) => {
           const price =
             billingInterval === "yearly" ? tier.yearlyPrice : tier.monthlyPrice
+          const href = tier.slug === "free" ? selfHostingDocsUrl : billingUrl
 
           return (
             <div className="relative flex w-full text-left" key={tier.slug}>
               {tier.highlighted && (
                 <div className="absolute -top-4 right-0 left-0 z-10 flex items-center justify-center">
                   <span className="rounded-full bg-primary px-3 py-1 font-medium text-primary-foreground text-xs shadow-sm">
-                    Most Popular
+                    Best Value
                   </span>
                 </div>
               )}
@@ -101,7 +103,7 @@ export function PricingSection() {
                   </ul>
                 </CardContent>
                 <CardFooter>
-                  <Link className="w-full" href={billingUrl}>
+                  <Link className="w-full" href={href}>
                     <Button
                       className="h-12 w-full rounded-xl font-medium text-base"
                       variant={tier.highlighted ? "default" : "secondary"}
