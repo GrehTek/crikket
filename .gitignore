@@ -51,8 +51,6 @@ temp
 storage
 local/
 backups/
-deploy/Caddyfile
-deploy/Caddyfile.bak.*
 
 .agents/
 AGENTS.md

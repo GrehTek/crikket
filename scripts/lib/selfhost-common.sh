@@ -70,6 +70,7 @@ ensure_selfhost_layout() {
   [[ -f "${ROOT_DIR}/docker-compose.yml" ]] || die "Run this script from the Crikket repository."
   [[ -f "${ROOT_DIR}/docker-compose.caddy.yml" ]] || die "Missing docker-compose.caddy.yml."
   [[ -f "${ROOT_DIR}/docker-compose.external-db.yml" ]] || die "Missing docker-compose.external-db.yml."
+  [[ -f "${ROOT_DIR}/Caddyfile" ]] || die "Missing ${ROOT_DIR}/Caddyfile."
   [[ -f "$ROOT_ENV_FILE" ]] || die "Missing ${ROOT_ENV_FILE}. Run ./scripts/setup.sh first."
   [[ -f "$SERVER_ENV_FILE" ]] || die "Missing ${SERVER_ENV_FILE}. Run ./scripts/setup.sh first."
   [[ -f "$WEB_ENV_FILE" ]] || die "Missing ${WEB_ENV_FILE}. Run ./scripts/setup.sh first."

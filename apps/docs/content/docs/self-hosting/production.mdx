@@ -70,7 +70,7 @@ Without them, self-hosted instances still work, but capture submission protectio
 
 This repo includes a production reverse proxy layer at `docker-compose.caddy.yml`.
 
-The install wizard can generate the required `deploy/Caddyfile` for you.
+The repo includes a root `Caddyfile` that reads its site addresses and ACME email from `.env` and `apps/web/.env`.
 
 Manual production layout:
 
@@ -97,19 +97,19 @@ Container routing note:
 - In the default compose file, `web` and `server` run as two containers.
 - `web` shares `server` networking, so server-side calls to `localhost:3000` work without extra internal URL variables.
 
-Example `deploy/Caddyfile` for separate app and API domains:
+Example `Caddyfile` for separate app and API domains:
 
 ```bash
 {
-	email ops@example.com
+	email {$CADDY_ACME_EMAIL}
 }
 
-app.example.com {
+{$NEXT_PUBLIC_APP_URL} {
 	encode gzip zstd
 	reverse_proxy server:3001
 }
 
-api.example.com {
+{$NEXT_PUBLIC_SERVER_URL} {
 	encode gzip zstd
 	reverse_proxy server:3000
 }

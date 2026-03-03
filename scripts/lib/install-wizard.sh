@@ -1,8 +1,6 @@
 ROOT_ENV_FILE="${ROOT_DIR}/.env"
 SERVER_ENV_FILE="${ROOT_DIR}/apps/server/.env"
 WEB_ENV_FILE="${ROOT_DIR}/apps/web/.env"
-DEPLOY_DIR="${ROOT_DIR}/deploy"
-CADDYFILE_PATH="${DEPLOY_DIR}/Caddyfile"
 
 DOCKER_COMPOSE=()
 COMPOSE_FILE_ARGS=()
@@ -285,6 +283,7 @@ ensure_repo_layout() {
   [[ -f "${ROOT_DIR}/docker-compose.yml" ]] || die "Run this script from the Crikket repository."
   [[ -f "${ROOT_DIR}/docker-compose.caddy.yml" ]] || die "Missing docker-compose.caddy.yml."
   [[ -f "${ROOT_DIR}/docker-compose.external-db.yml" ]] || die "Missing docker-compose.external-db.yml."
+  [[ -f "${ROOT_DIR}/Caddyfile" ]] || die "Missing Caddyfile."
   [[ -d "${ROOT_DIR}/apps/server" ]] || die "Missing apps/server."
   [[ -d "${ROOT_DIR}/apps/web" ]] || die "Missing apps/web."
 }
@@ -646,51 +645,16 @@ NEXT_PUBLIC_CRIKKET_KEY=
 EOF
 }
 
-write_caddyfile() {
-  local frontend_authority backend_authority
-
-  mkdir -p "$DEPLOY_DIR"
-  frontend_authority="$(url_authority "$NEXT_PUBLIC_APP_URL")"
-  backend_authority="$(url_authority "$NEXT_PUBLIC_SERVER_URL")"
-
-  cat >"$CADDYFILE_PATH" <<EOF
-{
-	email ${CADDY_ACME_EMAIL}
-}
-
-${frontend_authority} {
-	encode gzip zstd
-	reverse_proxy server:3001
-}
-
-${backend_authority} {
-	encode gzip zstd
-	reverse_proxy server:3000
-}
-EOF
-}
-
 persist_config() {
   backup_file_if_exists "$ROOT_ENV_FILE"
   backup_file_if_exists "$SERVER_ENV_FILE"
   backup_file_if_exists "$WEB_ENV_FILE"
 
-  if [[ "$PROXY_MODE" == "caddy" ]]; then
-    backup_file_if_exists "$CADDYFILE_PATH"
-  fi
-
   write_root_env
   write_server_env
   write_web_env
 
-  if [[ "$PROXY_MODE" == "caddy" ]]; then
-    write_caddyfile
-  fi
-
   chmod 600 "$ROOT_ENV_FILE" "$SERVER_ENV_FILE" "$WEB_ENV_FILE"
-  if [[ "$PROXY_MODE" == "caddy" ]]; then
-    chmod 644 "$CADDYFILE_PATH"
-  fi
 }
 
 print_summary() {
@@ -703,12 +667,6 @@ Files:
   - ${SERVER_ENV_FILE}
   - ${WEB_ENV_FILE}
 EOF
-
-  if [[ "$PROXY_MODE" == "caddy" ]]; then
-    cat <<EOF
-  - ${CADDYFILE_PATH}
-EOF
-  fi
 
   cat <<EOF
 

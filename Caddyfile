@@ -1,0 +1,13 @@
+{
+	email {$CADDY_ACME_EMAIL}
+}
+
+{$NEXT_PUBLIC_APP_URL} {
+	encode gzip zstd
+	reverse_proxy server:3001
+}
+
+{$NEXT_PUBLIC_SERVER_URL} {
+	encode gzip zstd
+	reverse_proxy server:3000
+}
