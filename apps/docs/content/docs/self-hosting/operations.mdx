@@ -5,19 +5,27 @@ description: Operations including updates, backups, monitoring, and runbook comm
 
 ## Update Procedure
 
-Prebuilt image mode:
+Recommended:
+
+```bash
+./scripts/update.sh
+```
+
+Manual equivalent for source builds:
+
+```bash
+git pull
+docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+```
+
+Advanced: prebuilt image mode:
 
 ```bash
 docker compose pull
 docker compose up -d
 ```
 
-Local build mode:
-
-```bash
-git pull
-docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
-```
+If you enabled built-in Caddy, add `-f docker-compose.caddy.yml` to the same commands.
 
 Post-update checks:
 
@@ -37,8 +45,10 @@ Minimum recommendation:
 Example database dump:
 
 ```bash
-docker exec crikket-postgres pg_dump -U postgres crikket > backup-$(date +%F).sql
+./scripts/backup-db.sh
 ```
+
+`backup-db.sh` is for the bundled Compose PostgreSQL service. If you use an external database, use that provider's backup tooling instead.
 
 ## Monitoring
 
@@ -52,17 +62,25 @@ Track at minimum:
 ## Quick Commands
 
 ```bash
-# Start
-docker compose up -d
+# Update
+./scripts/update.sh
+
+# Restart
+./scripts/restart.sh
+./scripts/restart.sh server web
 
 # Status
 docker compose ps
 
-# Migrate schema manually (if needed)
-docker compose run --rm migrate
-
 # Logs
 docker compose logs -f
+docker compose logs -f server
+
+# Database backup
+./scripts/backup-db.sh
+
+# Migrate schema manually (if needed)
+docker compose run --rm migrate
 
 # Stop
 docker compose down

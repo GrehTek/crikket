@@ -26,6 +26,7 @@ export function SignInForm() {
   )
   const { data: session, isPending } = authClient.useSession()
   const [isSocialSignInPending, setIsSocialSignInPending] = useState(false)
+  const isGoogleAuthEnabled = env.NEXT_PUBLIC_GOOGLE_AUTH_ENABLED
   const callbackURL = useMemo(() => {
     try {
       const appUrl = new URL(env.NEXT_PUBLIC_APP_URL)
@@ -121,26 +122,30 @@ export function SignInForm() {
       description="Sign in to your account to continue"
       title="Welcome back"
     >
-      <Button
-        className="h-12 w-full font-semibold text-base shadow-sm transition-all hover:bg-muted/50 hover:shadow-md active:scale-[0.98]"
-        disabled={isSocialSignInPending || form.state.isSubmitting}
-        onClick={handleGoogleSignIn}
-        type="button"
-        variant="outline"
-      >
-        <Icons.google className="mr-3 h-5 w-5" />
-        Continue with Google
-      </Button>
-      <div className="relative">
-        <div className="absolute inset-0 flex items-center">
-          <span className="w-full border-muted border-t" />
-        </div>
-        <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-card px-2 font-medium text-muted-foreground">
-            Or continue with email
-          </span>
-        </div>
-      </div>
+      {isGoogleAuthEnabled ? (
+        <>
+          <Button
+            className="h-12 w-full font-semibold text-base shadow-sm transition-all hover:bg-muted/50 hover:shadow-md active:scale-[0.98]"
+            disabled={isSocialSignInPending || form.state.isSubmitting}
+            onClick={handleGoogleSignIn}
+            type="button"
+            variant="outline"
+          >
+            <Icons.google className="mr-3 h-5 w-5" />
+            Continue with Google
+          </Button>
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-muted border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-card px-2 font-medium text-muted-foreground">
+                Or continue with email
+              </span>
+            </div>
+          </div>
+        </>
+      ) : null}
 
       <form
         className="grid gap-4"

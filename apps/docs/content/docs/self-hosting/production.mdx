@@ -13,8 +13,6 @@ BETTER_AUTH_SECRET
 BETTER_AUTH_URL
 CORS_ORIGINS
 BETTER_AUTH_COOKIE_DOMAIN (required when app and API use different subdomains)
-GOOGLE_CLIENT_ID
-GOOGLE_CLIENT_SECRET
 ENABLE_PAYMENTS (false)
 STORAGE_BUCKET
 STORAGE_ACCESS_KEY_ID
@@ -29,9 +27,14 @@ Set these in `apps/web/.env`:
 ```bash
 NEXT_PUBLIC_APP_URL
 NEXT_PUBLIC_SERVER_URL
+NEXT_PUBLIC_GOOGLE_AUTH_ENABLED (optional)
 ```
 
-> Google OAuth is currently the only login method. Keep `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` configured.
+Optional Google OAuth:
+
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `NEXT_PUBLIC_GOOGLE_AUTH_ENABLED=true`
 >
 > For self-hosting, set `ENABLE_PAYMENTS=false` and ignore `POLAR_*`.
 
@@ -39,7 +42,7 @@ Notes:
 
 - `DATABASE_URL` is the source of truth for the app.
 - `POSTGRES_*` vars are only for configuring the bundled Compose Postgres service.
-- Root `.env` is Docker-only (ports and bundled Postgres init).
+- Root `.env` is Docker-only (ports, bundled Postgres init, and optional Caddy settings).
 
 ## Recommended Security
 
@@ -61,26 +64,96 @@ What each one does:
 
 Without them, self-hosted instances still work, but capture submission protections are reduced.
 
-## Reverse Proxy and HTTPS
+`CAPTURE_SUBMIT_TOKEN_SECRET` can be set on its own. The setup wizard auto-generates it even if Redis and Turnstile are left disabled.
 
-Recommended layout:
+## Built-In Caddy Production Setup
 
-- Public traffic -> reverse proxy (`80/443`)
-- Proxy -> `web:3001`
-- API reachable via public URL (for example `https://api.example.com`)
+This repo includes a production reverse proxy layer at `docker-compose.caddy.yml`.
+
+The install wizard can generate the required `deploy/Caddyfile` for you.
+
+Manual production layout:
+
+- Public traffic -> Caddy (`80/443`)
+- Caddy -> `web:3001`
+- Caddy -> `server:3000`
+
+Start commands:
+
+Prebuilt images:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.caddy.yml up -d
+```
+
+Local source builds:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.build.yml -f docker-compose.caddy.yml up -d --build
+```
 
 Container routing note:
 
 - In the default compose file, `web` and `server` run as two containers.
 - `web` shares `server` networking, so server-side calls to `localhost:3000` work without extra internal URL variables.
 
-If using a separate API domain:
+Example `deploy/Caddyfile` for separate app and API domains:
 
 ```bash
+{
+	email ops@example.com
+}
+
+app.example.com {
+	encode gzip zstd
+	reverse_proxy server:3001
+}
+
+api.example.com {
+	encode gzip zstd
+	reverse_proxy server:3000
+}
+```
+
+Example `deploy/Caddyfile` for a single domain:
+
+```bash
+{
+	email ops@example.com
+}
+
+example.com {
+	encode gzip zstd
+
+	@api path /api/* /rpc/* /api-reference*
+	handle @api {
+		reverse_proxy server:3000
+	}
+
+	handle {
+		reverse_proxy server:3001
+	}
+}
+```
+
+Matching env for separate app and API domains:
+
+```bash
+NEXT_PUBLIC_APP_URL=https://app.example.com
 NEXT_PUBLIC_SERVER_URL=https://api.example.com
 BETTER_AUTH_URL=https://api.example.com
-CORS_ORIGINS=https://app.example.com,https://admin.example.com
+CORS_ORIGINS=https://app.example.com
 BETTER_AUTH_COOKIE_DOMAIN=example.com
+```
+
+Matching env for a single public domain:
+
+```bash
+NEXT_PUBLIC_APP_URL=https://example.com
+NEXT_PUBLIC_SERVER_URL=https://example.com
+BETTER_AUTH_URL=https://example.com
+CORS_ORIGINS=https://example.com
+BETTER_AUTH_COOKIE_DOMAIN=
 ```
 
 ## Storage

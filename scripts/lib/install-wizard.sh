@@ -1,0 +1,912 @@
+ROOT_ENV_FILE="${ROOT_DIR}/.env"
+SERVER_ENV_FILE="${ROOT_DIR}/apps/server/.env"
+WEB_ENV_FILE="${ROOT_DIR}/apps/web/.env"
+DEPLOY_DIR="${ROOT_DIR}/deploy"
+CADDYFILE_PATH="${DEPLOY_DIR}/Caddyfile"
+
+DOCKER_COMPOSE=()
+COMPOSE_FILE_ARGS=()
+
+info() {
+  printf '[crikket] %s\n' "$1"
+}
+
+warn() {
+  printf '[crikket] warning: %s\n' "$1" >&2
+}
+
+die() {
+  printf '[crikket] error: %s\n' "$1" >&2
+  exit 1
+}
+
+command_exists() {
+  command -v "$1" >/dev/null 2>&1
+}
+
+detect_docker_compose() {
+  if docker compose version >/dev/null 2>&1; then
+    DOCKER_COMPOSE=(docker compose)
+    return 0
+  fi
+
+  if command_exists docker-compose; then
+    DOCKER_COMPOSE=(docker-compose)
+    return 0
+  fi
+
+  return 1
+}
+
+require_command() {
+  if ! command_exists "$1"; then
+    die "Required command not found: $1"
+  fi
+}
+
+read_env_value() {
+  local file_path="$1"
+  local key="$2"
+
+  if [[ ! -f "$file_path" ]]; then
+    return 1
+  fi
+
+  awk -v key="$key" '
+    $0 ~ "^[[:space:]]*" key "=" {
+      line = $0
+      sub(/^[^=]*=/, "", line)
+      value = line
+      found = 1
+    }
+    END {
+      if (found == 1) {
+        print value
+      }
+    }
+  ' "$file_path"
+}
+
+default_value() {
+  local file_path="$1"
+  local key="$2"
+  local fallback="${3:-}"
+  local value
+
+  value="$(read_env_value "$file_path" "$key" || true)"
+  if [[ -n "$value" ]]; then
+    printf '%s\n' "$value"
+    return 0
+  fi
+
+  printf '%s\n' "$fallback"
+}
+
+prompt_value() {
+  local label="$1"
+  local default="${2:-}"
+  local value=""
+
+  if [[ -n "$default" ]]; then
+    read -r -p "${label} [${default}]: " value
+    printf '%s\n' "${value:-$default}"
+    return 0
+  fi
+
+  read -r -p "${label}: " value
+  printf '%s\n' "$value"
+}
+
+prompt_required_value() {
+  local label="$1"
+  local default="${2:-}"
+  local value=""
+
+  while true; do
+    value="$(prompt_value "$label" "$default")"
+    if [[ -n "$value" ]]; then
+      printf '%s\n' "$value"
+      return 0
+    fi
+    warn "${label} is required."
+  done
+}
+
+prompt_yes_no() {
+  local label="$1"
+  local default="${2:-yes}"
+  local prompt_suffix="[Y/n]"
+  local value=""
+
+  if [[ "$default" == "no" ]]; then
+    prompt_suffix="[y/N]"
+  fi
+
+  while true; do
+    read -r -p "${label} ${prompt_suffix}: " value
+    value="$(printf '%s' "$value" | tr '[:upper:]' '[:lower:]')"
+
+    if [[ -z "$value" ]]; then
+      value="$default"
+    fi
+
+    case "$value" in
+      y|yes)
+        return 0
+        ;;
+      n|no)
+        return 1
+        ;;
+      *)
+        warn "Please answer yes or no."
+        ;;
+    esac
+  done
+}
+
+normalize_url() {
+  local value="$1"
+
+  while [[ "$value" == */ ]]; do
+    value="${value%/}"
+  done
+
+  printf '%s\n' "$value"
+}
+
+normalize_host_input() {
+  local value="$1"
+
+  value="$(normalize_url "$value")"
+  value="${value#http://}"
+  value="${value#https://}"
+  value="${value%%/*}"
+
+  printf '%s\n' "$value"
+}
+
+validate_url() {
+  local value="$1"
+  [[ "$value" =~ ^https?://[^[:space:]]+$ ]]
+}
+
+url_authority() {
+  local value="$1"
+  value="${value#*://}"
+  value="${value%%/*}"
+  printf '%s\n' "$value"
+}
+
+url_host() {
+  local value="$1"
+  value="$(url_authority "$value")"
+  value="${value%%:*}"
+  printf '%s\n' "$value"
+}
+
+is_local_host() {
+  local value="$1"
+  case "$value" in
+    localhost|127.0.0.1|0.0.0.0|::1)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+validate_host_input() {
+  local value="$1"
+
+  if [[ -z "$value" || "$value" == *"/"* || "$value" == *" "* ]]; then
+    return 1
+  fi
+
+  [[ "$value" =~ ^[A-Za-z0-9.-]+(:[0-9]+)?$ ]]
+}
+
+validate_caddy_host() {
+  local value="$1"
+
+  if ! validate_host_input "$value"; then
+    return 1
+  fi
+
+  value="${value%%:*}"
+
+  if is_local_host "$value"; then
+    return 1
+  fi
+
+  if [[ "$value" =~ ^[0-9.]+$ ]]; then
+    return 1
+  fi
+
+  [[ "$value" == *.* ]]
+}
+
+validate_port_number() {
+  local value="$1"
+
+  if [[ ! "$value" =~ ^[0-9]{1,5}$ ]]; then
+    return 1
+  fi
+
+  (( value >= 1 && value <= 65535 ))
+}
+
+validate_host_port_binding() {
+  local value="$1"
+  local host_part="$value"
+  local port_part="$value"
+
+  if [[ "$value" == *:* ]]; then
+    host_part="${value%:*}"
+    port_part="${value##*:}"
+
+    if [[ -z "$host_part" ]]; then
+      return 1
+    fi
+  fi
+
+  validate_port_number "$port_part"
+}
+
+generate_secret() {
+  local length="${1:-48}"
+  local secret=""
+
+  if command_exists openssl; then
+    secret="$(openssl rand -base64 64 | tr -dc 'A-Za-z0-9' | cut -c1-"$length")"
+  else
+    secret="$(
+      set +o pipefail
+      LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c "$length"
+    )"
+  fi
+
+  if [[ -z "$secret" ]]; then
+    die "Failed to generate a secure random secret."
+  fi
+
+  printf '%s\n' "$secret"
+}
+
+backup_file_if_exists() {
+  local file_path="$1"
+
+  if [[ -f "$file_path" ]]; then
+    local backup_path="${file_path}.bak.$(date +%Y%m%d%H%M%S)"
+    cp "$file_path" "$backup_path"
+    info "Backed up $(basename "$file_path") to ${backup_path}"
+  fi
+}
+
+ensure_repo_layout() {
+  [[ -f "${ROOT_DIR}/docker-compose.yml" ]] || die "Run this script from the Crikket repository."
+  [[ -f "${ROOT_DIR}/docker-compose.build.yml" ]] || die "Missing docker-compose.build.yml."
+  [[ -f "${ROOT_DIR}/docker-compose.caddy.yml" ]] || die "Missing docker-compose.caddy.yml."
+  [[ -d "${ROOT_DIR}/apps/server" ]] || die "Missing apps/server."
+  [[ -d "${ROOT_DIR}/apps/web" ]] || die "Missing apps/web."
+}
+
+default_host_from_url() {
+  local file_path="$1"
+  local key="$2"
+  local fallback="$3"
+  local raw_value
+
+  raw_value="$(default_value "$file_path" "$key" "")"
+  if [[ -z "$raw_value" ]]; then
+    printf '%s\n' "$fallback"
+    return 0
+  fi
+
+  printf '%s\n' "$(normalize_host_input "$raw_value")"
+}
+
+build_public_urls() {
+  NEXT_PUBLIC_APP_URL="https://${FRONTEND_HOST}"
+  NEXT_PUBLIC_SITE_URL="$NEXT_PUBLIC_APP_URL"
+  NEXT_PUBLIC_SERVER_URL="https://${BACKEND_HOST}"
+  BETTER_AUTH_URL="$NEXT_PUBLIC_SERVER_URL"
+  CORS_ORIGINS="$NEXT_PUBLIC_APP_URL"
+}
+
+derive_cookie_domain() {
+  local frontend_host="$1"
+  local backend_host="$2"
+  local shared_suffix=""
+
+  frontend_host="${frontend_host%%:*}"
+  backend_host="${backend_host%%:*}"
+
+  if [[ "$frontend_host" == "$backend_host" ]]; then
+    printf '\n'
+    return 0
+  fi
+
+  shared_suffix="$(
+    awk -v left="$frontend_host" -v right="$backend_host" '
+      function split_labels(value, labels,    count) {
+        count = split(value, labels, ".")
+        return count
+      }
+
+      BEGIN {
+        left_count = split_labels(left, left_labels)
+        right_count = split_labels(right, right_labels)
+        suffix = ""
+
+        while (left_count > 0 && right_count > 0) {
+          if (left_labels[left_count] != right_labels[right_count]) {
+            break
+          }
+
+          if (suffix == "") {
+            suffix = left_labels[left_count]
+          } else {
+            suffix = left_labels[left_count] "." suffix
+          }
+
+          left_count--
+          right_count--
+        }
+
+        print suffix
+      }
+    '
+  )"
+
+  if [[ "$shared_suffix" == *.* ]]; then
+    printf '%s\n' "$shared_suffix"
+    return 0
+  fi
+
+  printf '\n'
+}
+
+configure_deploy_mode() {
+  DEPLOY_MODE_DEFAULT="source"
+  DEPLOY_MODE_PROMPT="Build locally from this repo"
+  DEPLOY_MODE_EXISTING="$(default_value "$ROOT_ENV_FILE" "CRIKKET_DEPLOY_MODE" "")"
+
+  if [[ "$DEPLOY_MODE_EXISTING" == "prebuilt" ]]; then
+    DEPLOY_MODE_DEFAULT="prebuilt"
+    DEPLOY_MODE_PROMPT="Use prebuilt container images"
+  fi
+
+  info "Source builds are recommended for self-hosting because the web app's public URLs are compiled into the image."
+  if prompt_yes_no "${DEPLOY_MODE_PROMPT}?" "$( [[ "$DEPLOY_MODE_DEFAULT" == "source" ]] && printf 'yes' || printf 'no' )"; then
+    DEPLOY_MODE="source"
+    DEPLOY_MODE_LABEL="Local source build via docker-compose.build.yml"
+    return 0
+  fi
+
+  DEPLOY_MODE="prebuilt"
+  DEPLOY_MODE_LABEL="Prebuilt images"
+  warn "Use prebuilt mode only if your web image was built for the exact domains you enter below."
+  if ! prompt_yes_no "Continue with prebuilt mode" "no"; then
+    die "Installation cancelled."
+  fi
+}
+
+configure_domains() {
+  local frontend_default backend_default separate_backend_default existing_cookie_domain
+
+  frontend_default="$(default_host_from_url "$WEB_ENV_FILE" "NEXT_PUBLIC_APP_URL" "app.example.com")"
+  backend_default="$(default_host_from_url "$WEB_ENV_FILE" "NEXT_PUBLIC_SERVER_URL" "api.example.com")"
+  existing_cookie_domain="$(default_value "$SERVER_ENV_FILE" "BETTER_AUTH_COOKIE_DOMAIN" "")"
+  separate_backend_default="yes"
+
+  FRONTEND_HOST="$(normalize_host_input "$(prompt_required_value "Frontend domain" "$frontend_default")")"
+  validate_host_input "$FRONTEND_HOST" || die "Frontend domain must be a hostname like app.example.com"
+
+  if [[ "$frontend_default" == "$backend_default" ]]; then
+    separate_backend_default="no"
+  fi
+
+  if prompt_yes_no "Use a separate backend/API domain" "$separate_backend_default"; then
+    BACKEND_HOST="$(normalize_host_input "$(prompt_required_value "Backend/API domain" "$backend_default")")"
+    validate_host_input "$BACKEND_HOST" || die "Backend/API domain must be a hostname like api.example.com"
+  else
+    BACKEND_HOST="$FRONTEND_HOST"
+  fi
+
+  build_public_urls
+  BETTER_AUTH_COOKIE_DOMAIN="$(derive_cookie_domain "$FRONTEND_HOST" "$BACKEND_HOST")"
+
+  if [[ -z "$BETTER_AUTH_COOKIE_DOMAIN" && "$FRONTEND_HOST" != "$BACKEND_HOST" && -n "$existing_cookie_domain" ]]; then
+    BETTER_AUTH_COOKIE_DOMAIN="$existing_cookie_domain"
+  fi
+}
+
+configure_proxy() {
+  local proxy_default
+
+  PROXY_MODE_EXISTING="$(default_value "$ROOT_ENV_FILE" "CRIKKET_PROXY_MODE" "")"
+  proxy_default="yes"
+
+  if [[ "$PROXY_MODE_EXISTING" == "none" ]]; then
+    proxy_default="no"
+  fi
+
+  if prompt_yes_no "Enable built-in Caddy reverse proxy with automatic HTTPS" "$proxy_default"; then
+    PROXY_MODE="caddy"
+    PROXY_MODE_LABEL="Caddy with automatic HTTPS"
+
+    validate_caddy_host "$FRONTEND_HOST" || die "Caddy mode requires a real public frontend domain."
+    validate_caddy_host "$BACKEND_HOST" || die "Caddy mode requires a real public backend domain."
+
+    CADDY_ACME_EMAIL="$(prompt_required_value "Email for Caddy TLS certificates" "$(default_value "$ROOT_ENV_FILE" "CADDY_ACME_EMAIL" "")")"
+    CADDY_HTTP_PORT="$(default_value "$ROOT_ENV_FILE" "CADDY_HTTP_PORT" "80")"
+    CADDY_HTTPS_PORT="$(default_value "$ROOT_ENV_FILE" "CADDY_HTTPS_PORT" "443")"
+    validate_port_number "$CADDY_HTTP_PORT" || die "Caddy HTTP port must be a number between 1 and 65535."
+    validate_port_number "$CADDY_HTTPS_PORT" || die "Caddy HTTPS port must be a number between 1 and 65535."
+    return 0
+  fi
+
+  PROXY_MODE="none"
+  PROXY_MODE_LABEL="No built-in reverse proxy"
+  CADDY_ACME_EMAIL=""
+  CADDY_HTTP_PORT=""
+  CADDY_HTTPS_PORT=""
+}
+
+configure_bindings() {
+  local localhost_only_default
+
+  localhost_only_default="yes"
+  if [[ "$PROXY_MODE" != "caddy" ]]; then
+    if prompt_yes_no "Bind container ports to localhost only" "$localhost_only_default"; then
+      WEB_PORT="$(default_value "$ROOT_ENV_FILE" "WEB_PORT" "127.0.0.1:3001")"
+      SERVER_PORT="$(default_value "$ROOT_ENV_FILE" "SERVER_PORT" "127.0.0.1:3000")"
+      POSTGRES_PORT="$(default_value "$ROOT_ENV_FILE" "POSTGRES_PORT" "127.0.0.1:5432")"
+    else
+      WEB_PORT="$(default_value "$ROOT_ENV_FILE" "WEB_PORT" "3001")"
+      SERVER_PORT="$(default_value "$ROOT_ENV_FILE" "SERVER_PORT" "3000")"
+      POSTGRES_PORT="$(default_value "$ROOT_ENV_FILE" "POSTGRES_PORT" "5432")"
+    fi
+  else
+    WEB_PORT="$(default_value "$ROOT_ENV_FILE" "WEB_PORT" "127.0.0.1:3001")"
+    SERVER_PORT="$(default_value "$ROOT_ENV_FILE" "SERVER_PORT" "127.0.0.1:3000")"
+    POSTGRES_PORT="$(default_value "$ROOT_ENV_FILE" "POSTGRES_PORT" "127.0.0.1:5432")"
+  fi
+
+  validate_host_port_binding "$WEB_PORT" || die "Web host binding must be a port or host:port pair."
+  validate_host_port_binding "$SERVER_PORT" || die "API host binding must be a port or host:port pair."
+  validate_host_port_binding "$POSTGRES_PORT" || die "Postgres host binding must be a port or host:port pair."
+}
+
+configure_database() {
+  local external_database_default database_default
+
+  POSTGRES_USER="$(default_value "$ROOT_ENV_FILE" "POSTGRES_USER" "postgres")"
+  POSTGRES_DB="$(default_value "$ROOT_ENV_FILE" "POSTGRES_DB" "crikket")"
+  POSTGRES_PASSWORD="$(default_value "$ROOT_ENV_FILE" "POSTGRES_PASSWORD" "$(generate_secret 32)")"
+
+  external_database_default="no"
+  database_default="$(default_value "$SERVER_ENV_FILE" "DATABASE_URL" "")"
+
+  if [[ -n "$database_default" && "$database_default" != *"@postgres:5432/"* ]]; then
+    external_database_default="yes"
+  fi
+
+  if prompt_yes_no "Use an external PostgreSQL database" "$external_database_default"; then
+    DATABASE_URL="$(prompt_required_value "Database URL" "$database_default")"
+    if [[ "$DATABASE_URL" != postgresql://* && "$DATABASE_URL" != postgres://* ]]; then
+      die "Database URL must start with postgresql:// or postgres://"
+    fi
+    return 0
+  fi
+
+  DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}"
+}
+
+configure_auth() {
+  BETTER_AUTH_SECRET="$(default_value "$SERVER_ENV_FILE" "BETTER_AUTH_SECRET" "$(generate_secret 64)")"
+  CAPTURE_SUBMIT_TOKEN_SECRET="$(default_value "$SERVER_ENV_FILE" "CAPTURE_SUBMIT_TOKEN_SECRET" "$(generate_secret 64)")"
+
+  if [[ "${#BETTER_AUTH_SECRET}" -lt 32 ]]; then
+    die "BETTER_AUTH_SECRET must be at least 32 characters."
+  fi
+
+  if [[ "${#CAPTURE_SUBMIT_TOKEN_SECRET}" -lt 32 ]]; then
+    die "CAPTURE_SUBMIT_TOKEN_SECRET must be at least 32 characters."
+  fi
+
+  GOOGLE_CLIENT_ID=""
+  GOOGLE_CLIENT_SECRET=""
+  NEXT_PUBLIC_GOOGLE_AUTH_ENABLED="false"
+
+  if prompt_yes_no "Configure Google OAuth sign-in" "$( [[ -n "$(default_value "$SERVER_ENV_FILE" "GOOGLE_CLIENT_ID" "")" && -n "$(default_value "$SERVER_ENV_FILE" "GOOGLE_CLIENT_SECRET" "")" ]] && printf 'yes' || printf 'no' )"; then
+    GOOGLE_CLIENT_ID="$(prompt_required_value "Google OAuth client ID" "$(default_value "$SERVER_ENV_FILE" "GOOGLE_CLIENT_ID" "")")"
+    GOOGLE_CLIENT_SECRET="$(prompt_required_value "Google OAuth client secret" "$(default_value "$SERVER_ENV_FILE" "GOOGLE_CLIENT_SECRET" "")")"
+    NEXT_PUBLIC_GOOGLE_AUTH_ENABLED="true"
+  fi
+}
+
+configure_storage() {
+  STORAGE_BUCKET="$(prompt_required_value "Storage bucket name" "$(default_value "$SERVER_ENV_FILE" "STORAGE_BUCKET" "")")"
+  STORAGE_ACCESS_KEY_ID="$(prompt_required_value "Storage access key ID" "$(default_value "$SERVER_ENV_FILE" "STORAGE_ACCESS_KEY_ID" "")")"
+  STORAGE_SECRET_ACCESS_KEY="$(prompt_required_value "Storage secret access key" "$(default_value "$SERVER_ENV_FILE" "STORAGE_SECRET_ACCESS_KEY" "")")"
+  STORAGE_ENDPOINT="$(normalize_url "$(prompt_value "Storage endpoint URL (leave blank for AWS S3)" "$(default_value "$SERVER_ENV_FILE" "STORAGE_ENDPOINT" "")")")"
+
+  if [[ -n "$STORAGE_ENDPOINT" ]]; then
+    validate_url "$STORAGE_ENDPOINT" || die "Storage endpoint must start with http:// or https://"
+    STORAGE_REGION="$(prompt_value "Storage region (optional for custom S3-compatible providers)" "$(default_value "$SERVER_ENV_FILE" "STORAGE_REGION" "")")"
+  else
+    STORAGE_REGION="$(prompt_required_value "Storage region" "$(default_value "$SERVER_ENV_FILE" "STORAGE_REGION" "")")"
+  fi
+
+  STORAGE_PUBLIC_URL="$(normalize_url "$(prompt_value "Storage public URL (optional)" "$(default_value "$SERVER_ENV_FILE" "STORAGE_PUBLIC_URL" "")")")"
+  if [[ -n "$STORAGE_PUBLIC_URL" ]] && ! validate_url "$STORAGE_PUBLIC_URL"; then
+    die "Storage public URL must start with http:// or https://"
+  fi
+}
+
+configure_optional_services() {
+  RESEND_API_KEY=""
+  RESEND_FROM_EMAIL=""
+  if prompt_yes_no "Configure Resend email delivery now" "no"; then
+    RESEND_API_KEY="$(prompt_required_value "Resend API key" "$(default_value "$SERVER_ENV_FILE" "RESEND_API_KEY" "")")"
+    RESEND_FROM_EMAIL="$(prompt_required_value "Resend from email" "$(default_value "$SERVER_ENV_FILE" "RESEND_FROM_EMAIL" "")")"
+  fi
+
+  UPSTASH_REDIS_REST_URL=""
+  UPSTASH_REDIS_REST_TOKEN=""
+  if prompt_yes_no "Configure Upstash Redis for capture rate limiting" "no"; then
+    UPSTASH_REDIS_REST_URL="$(prompt_required_value "Upstash Redis REST URL" "$(default_value "$SERVER_ENV_FILE" "UPSTASH_REDIS_REST_URL" "")")"
+    UPSTASH_REDIS_REST_TOKEN="$(prompt_required_value "Upstash Redis REST token" "$(default_value "$SERVER_ENV_FILE" "UPSTASH_REDIS_REST_TOKEN" "")")"
+    validate_url "$UPSTASH_REDIS_REST_URL" || die "Upstash Redis REST URL must start with http:// or https://"
+  fi
+
+  TURNSTILE_SITE_KEY=""
+  TURNSTILE_SECRET_KEY=""
+  if prompt_yes_no "Configure Cloudflare Turnstile for capture bot protection" "no"; then
+    TURNSTILE_SITE_KEY="$(prompt_required_value "Turnstile site key" "$(default_value "$SERVER_ENV_FILE" "TURNSTILE_SITE_KEY" "")")"
+    TURNSTILE_SECRET_KEY="$(prompt_required_value "Turnstile secret key" "$(default_value "$SERVER_ENV_FILE" "TURNSTILE_SECRET_KEY" "")")"
+  fi
+
+  NEXT_PUBLIC_POSTHOG_KEY=""
+  NEXT_PUBLIC_POSTHOG_HOST=""
+  if prompt_yes_no "Configure PostHog client analytics" "no"; then
+    NEXT_PUBLIC_POSTHOG_KEY="$(prompt_required_value "PostHog project key" "$(default_value "$WEB_ENV_FILE" "NEXT_PUBLIC_POSTHOG_KEY" "")")"
+    NEXT_PUBLIC_POSTHOG_HOST="$(prompt_required_value "PostHog host URL" "$(default_value "$WEB_ENV_FILE" "NEXT_PUBLIC_POSTHOG_HOST" "")")"
+    validate_url "$NEXT_PUBLIC_POSTHOG_HOST" || die "PostHog host URL must start with http:// or https://"
+  fi
+}
+
+write_root_env() {
+  cat >"$ROOT_ENV_FILE" <<EOF
+# Generated by scripts/setup.sh
+# Docker Compose host port bindings.
+
+CRIKKET_DEPLOY_MODE=${DEPLOY_MODE}
+CRIKKET_PROXY_MODE=${PROXY_MODE}
+WEB_PORT=${WEB_PORT}
+SERVER_PORT=${SERVER_PORT}
+POSTGRES_PORT=${POSTGRES_PORT}
+CADDY_HTTP_PORT=${CADDY_HTTP_PORT}
+CADDY_HTTPS_PORT=${CADDY_HTTPS_PORT}
+CADDY_ACME_EMAIL=${CADDY_ACME_EMAIL}
+
+# Bundled postgres service settings.
+POSTGRES_USER=${POSTGRES_USER}
+POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+POSTGRES_DB=${POSTGRES_DB}
+POSTGRES_HOST_AUTH_METHOD=scram-sha-256
+EOF
+}
+
+write_server_env() {
+  cat >"$SERVER_ENV_FILE" <<EOF
+NODE_ENV=production
+
+# Database
+DATABASE_URL=${DATABASE_URL}
+CORS_ORIGINS=${CORS_ORIGINS}
+
+# Better Auth
+BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
+BETTER_AUTH_URL=${BETTER_AUTH_URL}
+BETTER_AUTH_COOKIE_DOMAIN=${BETTER_AUTH_COOKIE_DOMAIN}
+
+# OAuth
+GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+
+# Self-hosted instances should keep payments disabled.
+ENABLE_PAYMENTS=false
+POLAR_ACCESS_TOKEN=
+POLAR_SUCCESS_URL=
+POLAR_WEBHOOK_SECRET=
+POLAR_PRO_PRODUCT_ID=
+POLAR_PRO_YEARLY_PRODUCT_ID=
+POLAR_STUDIO_PRODUCT_ID=
+POLAR_STUDIO_YEARLY_PRODUCT_ID=
+
+# Email
+RESEND_API_KEY=${RESEND_API_KEY}
+RESEND_FROM_EMAIL=${RESEND_FROM_EMAIL}
+
+# Storage
+STORAGE_BUCKET=${STORAGE_BUCKET}
+STORAGE_ACCESS_KEY_ID=${STORAGE_ACCESS_KEY_ID}
+STORAGE_SECRET_ACCESS_KEY=${STORAGE_SECRET_ACCESS_KEY}
+STORAGE_REGION=${STORAGE_REGION}
+STORAGE_ENDPOINT=${STORAGE_ENDPOINT}
+STORAGE_PUBLIC_URL=${STORAGE_PUBLIC_URL}
+
+# Recommended capture protection
+CAPTURE_SUBMIT_TOKEN_SECRET=${CAPTURE_SUBMIT_TOKEN_SECRET}
+UPSTASH_REDIS_REST_URL=${UPSTASH_REDIS_REST_URL}
+UPSTASH_REDIS_REST_TOKEN=${UPSTASH_REDIS_REST_TOKEN}
+TURNSTILE_SITE_KEY=${TURNSTILE_SITE_KEY}
+TURNSTILE_SECRET_KEY=${TURNSTILE_SECRET_KEY}
+EOF
+}
+
+write_web_env() {
+  cat >"$WEB_ENV_FILE" <<EOF
+NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL}
+NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
+NEXT_PUBLIC_SERVER_URL=${NEXT_PUBLIC_SERVER_URL}
+NEXT_PUBLIC_GOOGLE_AUTH_ENABLED=${NEXT_PUBLIC_GOOGLE_AUTH_ENABLED}
+
+# PostHog (optional)
+NEXT_PUBLIC_POSTHOG_KEY=${NEXT_PUBLIC_POSTHOG_KEY}
+NEXT_PUBLIC_POSTHOG_HOST=${NEXT_PUBLIC_POSTHOG_HOST}
+
+# Crikket Capture (optional)
+NEXT_PUBLIC_CRIKKET_KEY=
+EOF
+}
+
+write_caddyfile() {
+  local frontend_authority backend_authority frontend_domain backend_domain
+
+  mkdir -p "$DEPLOY_DIR"
+  frontend_authority="$(url_authority "$NEXT_PUBLIC_APP_URL")"
+  backend_authority="$(url_authority "$NEXT_PUBLIC_SERVER_URL")"
+  frontend_domain="$(url_host "$NEXT_PUBLIC_APP_URL")"
+  backend_domain="$(url_host "$NEXT_PUBLIC_SERVER_URL")"
+
+  if [[ "$frontend_domain" == "$backend_domain" ]]; then
+    cat >"$CADDYFILE_PATH" <<EOF
+{
+	email ${CADDY_ACME_EMAIL}
+}
+
+${frontend_authority} {
+	encode gzip zstd
+
+	@api path /api/* /rpc/* /api-reference*
+	handle @api {
+		reverse_proxy server:3000
+	}
+
+	handle {
+		reverse_proxy server:3001
+	}
+}
+EOF
+    return 0
+  fi
+
+  cat >"$CADDYFILE_PATH" <<EOF
+{
+	email ${CADDY_ACME_EMAIL}
+}
+
+${frontend_authority} {
+	encode gzip zstd
+	reverse_proxy server:3001
+}
+
+${backend_authority} {
+	encode gzip zstd
+	reverse_proxy server:3000
+}
+EOF
+}
+
+persist_config() {
+  backup_file_if_exists "$ROOT_ENV_FILE"
+  backup_file_if_exists "$SERVER_ENV_FILE"
+  backup_file_if_exists "$WEB_ENV_FILE"
+
+  if [[ "$PROXY_MODE" == "caddy" ]]; then
+    backup_file_if_exists "$CADDYFILE_PATH"
+  fi
+
+  write_root_env
+  write_server_env
+  write_web_env
+
+  if [[ "$PROXY_MODE" == "caddy" ]]; then
+    write_caddyfile
+  fi
+
+  chmod 600 "$ROOT_ENV_FILE" "$SERVER_ENV_FILE" "$WEB_ENV_FILE"
+  if [[ "$PROXY_MODE" == "caddy" ]]; then
+    chmod 644 "$CADDYFILE_PATH"
+  fi
+}
+
+print_summary() {
+  cat <<EOF
+
+Crikket configuration written successfully.
+
+Files:
+  - ${ROOT_ENV_FILE}
+  - ${SERVER_ENV_FILE}
+  - ${WEB_ENV_FILE}
+EOF
+
+  if [[ "$PROXY_MODE" == "caddy" ]]; then
+    cat <<EOF
+  - ${CADDYFILE_PATH}
+EOF
+  fi
+
+  cat <<EOF
+
+Deploy mode:
+  - ${DEPLOY_MODE_LABEL}
+Proxy mode:
+  - ${PROXY_MODE_LABEL}
+
+Domains:
+  - Frontend: ${FRONTEND_HOST}
+  - Backend: ${BACKEND_HOST}
+
+Auto-filled URLs:
+  - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
+  - NEXT_PUBLIC_SERVER_URL=${NEXT_PUBLIC_SERVER_URL}
+  - BETTER_AUTH_URL=${BETTER_AUTH_URL}
+  - CORS_ORIGINS=${CORS_ORIGINS}
+  - BETTER_AUTH_COOKIE_DOMAIN=${BETTER_AUTH_COOKIE_DOMAIN}
+  - NEXT_PUBLIC_GOOGLE_AUTH_ENABLED=${NEXT_PUBLIC_GOOGLE_AUTH_ENABLED}
+
+Local bindings:
+  - Web: ${WEB_PORT}
+  - API: ${SERVER_PORT}
+  - Postgres: ${POSTGRES_PORT}
+EOF
+
+  if [[ "$PROXY_MODE" == "caddy" ]]; then
+    cat <<EOF
+  - Caddy HTTP: ${CADDY_HTTP_PORT}
+  - Caddy HTTPS: ${CADDY_HTTPS_PORT}
+EOF
+  fi
+
+  cat <<EOF
+
+Google OAuth callback:
+  - ${BETTER_AUTH_URL}/api/auth/callback/google
+EOF
+
+  if [[ -z "$BETTER_AUTH_COOKIE_DOMAIN" && "$FRONTEND_HOST" != "$BACKEND_HOST" ]]; then
+    cat <<EOF
+
+Warning:
+  - Frontend and backend use different hosts, but no shared cookie domain could be derived automatically.
+    If cross-subdomain auth fails, set BETTER_AUTH_COOKIE_DOMAIN manually to your shared root domain.
+EOF
+  fi
+
+  if [[ "$PROXY_MODE" == "caddy" ]]; then
+    cat <<EOF
+
+Next step:
+  - Point DNS for ${FRONTEND_HOST} and ${BACKEND_HOST} at this host.
+  - Ensure inbound ports ${CADDY_HTTP_PORT} and ${CADDY_HTTPS_PORT} are open.
+EOF
+    return 0
+  fi
+
+  cat <<EOF
+
+Next step:
+  - Point your reverse proxy at ${WEB_PORT} for the app and ${SERVER_PORT} for the API.
+EOF
+}
+
+build_compose_file_args() {
+  COMPOSE_FILE_ARGS=("-f" "docker-compose.yml")
+
+  if [[ "$DEPLOY_MODE" == "source" ]]; then
+    COMPOSE_FILE_ARGS+=("-f" "docker-compose.build.yml")
+  fi
+
+  if [[ "$PROXY_MODE" == "caddy" ]]; then
+    COMPOSE_FILE_ARGS+=("-f" "docker-compose.caddy.yml")
+  fi
+}
+
+run_compose_config() {
+  build_compose_file_args
+
+  if [[ "$DEPLOY_MODE" == "source" ]]; then
+    env \
+      NEXT_PUBLIC_SITE_URL="${NEXT_PUBLIC_SITE_URL}" \
+      NEXT_PUBLIC_APP_URL="${NEXT_PUBLIC_APP_URL}" \
+      NEXT_PUBLIC_SERVER_URL="${NEXT_PUBLIC_SERVER_URL}" \
+      NEXT_PUBLIC_GOOGLE_AUTH_ENABLED="${NEXT_PUBLIC_GOOGLE_AUTH_ENABLED}" \
+      NEXT_PUBLIC_CRIKKET_KEY="" \
+      NEXT_PUBLIC_DEMO_URL="" \
+      NEXT_PUBLIC_POSTHOG_KEY="${NEXT_PUBLIC_POSTHOG_KEY}" \
+      NEXT_PUBLIC_POSTHOG_HOST="${NEXT_PUBLIC_POSTHOG_HOST}" \
+      "${DOCKER_COMPOSE[@]}" "${COMPOSE_FILE_ARGS[@]}" config >/dev/null
+    return 0
+  fi
+
+  "${DOCKER_COMPOSE[@]}" "${COMPOSE_FILE_ARGS[@]}" config >/dev/null
+}
+
+start_stack() {
+  require_command docker
+  detect_docker_compose || die "Docker Compose is required. Install Docker Compose v2 or docker-compose."
+
+  if ! docker info >/dev/null 2>&1; then
+    die "Docker is installed but the daemon is not reachable."
+  fi
+
+  info "Validating Docker Compose configuration..."
+  run_compose_config
+
+  if [[ "$DEPLOY_MODE" == "source" ]]; then
+    info "Building and starting the Crikket stack from local source..."
+    env \
+      NEXT_PUBLIC_SITE_URL="${NEXT_PUBLIC_SITE_URL}" \
+      NEXT_PUBLIC_APP_URL="${NEXT_PUBLIC_APP_URL}" \
+      NEXT_PUBLIC_SERVER_URL="${NEXT_PUBLIC_SERVER_URL}" \
+      NEXT_PUBLIC_GOOGLE_AUTH_ENABLED="${NEXT_PUBLIC_GOOGLE_AUTH_ENABLED}" \
+      NEXT_PUBLIC_CRIKKET_KEY="" \
+      NEXT_PUBLIC_DEMO_URL="" \
+      NEXT_PUBLIC_POSTHOG_KEY="${NEXT_PUBLIC_POSTHOG_KEY}" \
+      NEXT_PUBLIC_POSTHOG_HOST="${NEXT_PUBLIC_POSTHOG_HOST}" \
+      "${DOCKER_COMPOSE[@]}" "${COMPOSE_FILE_ARGS[@]}" up -d --build
+  else
+    info "Pulling and starting the Crikket stack..."
+    "${DOCKER_COMPOSE[@]}" "${COMPOSE_FILE_ARGS[@]}" pull
+    "${DOCKER_COMPOSE[@]}" "${COMPOSE_FILE_ARGS[@]}" up -d
+  fi
+
+  "${DOCKER_COMPOSE[@]}" "${COMPOSE_FILE_ARGS[@]}" ps
+}
+
+main() {
+  info "Crikket self-host install wizard"
+  ensure_repo_layout
+  require_command awk
+  require_command cp
+  require_command cut
+  require_command date
+  require_command tr
+
+  if [[ -f "$ROOT_ENV_FILE" || -f "$SERVER_ENV_FILE" || -f "$WEB_ENV_FILE" ]]; then
+    info "Existing env files were found. Current values will be used as defaults and backed up before rewrite."
+  fi
+
+  configure_deploy_mode
+  configure_domains
+  configure_proxy
+  configure_bindings
+  configure_database
+  configure_auth
+  configure_storage
+  configure_optional_services
+
+  persist_config
+  print_summary
+
+  if prompt_yes_no "Start Crikket now with Docker Compose" "yes"; then
+    start_stack
+    info "Crikket is starting. Follow logs with: ${DOCKER_COMPOSE[*]} logs -f"
+  else
+    info "Skipping Docker Compose startup."
+  fi
+}

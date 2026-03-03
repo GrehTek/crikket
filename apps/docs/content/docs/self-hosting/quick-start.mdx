@@ -18,6 +18,14 @@ Security baseline:
 - Keep `3000`, `3001`, and `5432` private
 - Use a strong `BETTER_AUTH_SECRET`
 
+> Want the fast path instead of following the manual steps below? Run:
+>
+> ```bash
+> ./scripts/setup.sh
+> ```
+>
+> The install wizard handles env files, secrets, domains, Caddy, and Docker startup for a terminal-only VPS setup.
+
 <Steps>
   <Step>
 
@@ -57,13 +65,11 @@ For production, set these explicitly:
 
 ```bash
 DATABASE_URL
-BETTER_AUTH_SECRET (32+ characters)
+BETTER_AUTH_SECRET
 NEXT_PUBLIC_APP_URL
 NEXT_PUBLIC_SERVER_URL
 BETTER_AUTH_URL
 CORS_ORIGINS
-GOOGLE_CLIENT_ID
-GOOGLE_CLIENT_SECRET
 ENABLE_PAYMENTS (false)
 ```
 
@@ -75,6 +81,14 @@ UPSTASH_REDIS_REST_URL
 UPSTASH_REDIS_REST_TOKEN
 TURNSTILE_SITE_KEY
 TURNSTILE_SECRET_KEY
+```
+
+Optional Google OAuth:
+
+```bash
+GOOGLE_CLIENT_ID
+GOOGLE_CLIENT_SECRET
+NEXT_PUBLIC_GOOGLE_AUTH_ENABLED=true
 ```
 
   </Step>
@@ -93,6 +107,18 @@ Local source build:
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+```
+
+Production with built-in Caddy:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.caddy.yml up -d
+```
+
+Production with built-in Caddy and local source builds:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.build.yml -f docker-compose.caddy.yml up -d --build
 ```
 
   </Step>

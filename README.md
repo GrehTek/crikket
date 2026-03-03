@@ -27,6 +27,12 @@ Crikket makes it easier for teams to report bugs and fix them faster.
 - [Hosted Service](https://crikket.io): Use Crikket right away. (paid)
 - [Self Hosting](https://crikket.io/docs/self-hosting): Run Crikket on your own infrastructure. (free)
 
+From a fresh clone, the fastest self-hosted setup path is:
+
+```bash
+./scripts/setup.sh
+```
+
 Explore [documentation](https://crikket.io/docs) to learn more.
 
 ## License
