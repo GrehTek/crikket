@@ -1,4 +1,4 @@
-name: Release
+name: Version Packages
 
 on:
   push:
@@ -9,6 +9,10 @@ on:
 permissions:
   contents: write
   pull-requests: write
+
+concurrency:
+  group: version-packages
+  cancel-in-progress: true
 
 jobs:
   version:
@@ -31,7 +35,7 @@ jobs:
         uses: changesets/action@v1
         with:
           version: bun run changeset:version
-          commit: "chore(release): version apps"
-          title: "chore(release): version apps"
+          commit: "chore(release): version packages"
+          title: "chore(release): version packages"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
