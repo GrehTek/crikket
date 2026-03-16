@@ -78,6 +78,7 @@
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
+    "start":"next start -p $PORT",
     "check-types": "turbo run check-types",
     "dev:native": "turbo run dev --filter=native",
     "dev:web": "turbo run dev --filter=web",
